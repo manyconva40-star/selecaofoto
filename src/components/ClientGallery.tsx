@@ -274,7 +274,7 @@ export default function ClientGallery({ session }: ClientGalleryProps) {
             <AlertCircle className="w-10 h-10 mx-auto mb-3" />
             <p className="font-medium">{error}</p>
             <button 
-              onClick={() => fetchPhotos(password)} 
+              onClick={() => fetchPhotos()} 
               className="mt-4 text-xs underline cursor-pointer hover:text-white"
             >
               Tentar novamente
