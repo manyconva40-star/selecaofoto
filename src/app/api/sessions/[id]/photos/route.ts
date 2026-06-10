@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase';
 
+export const dynamic = 'force-dynamic';
+
 export async function GET(
   request: Request,
   { params }: { params: Promise<{ id: string }> }
@@ -25,7 +27,7 @@ export async function GET(
     }
 
     // 2. Se a sessão tiver senha, verificar correspondência
-    if (dbSession.password && dbSession.password !== clientPassword) {
+    if (dbSession.password && dbSession.password.trim() !== clientPassword.trim()) {
       return NextResponse.json(
         { error: 'Acesso negado. Senha incorreta.' },
         { status: 403 }

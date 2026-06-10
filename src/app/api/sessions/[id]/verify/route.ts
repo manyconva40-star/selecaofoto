@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase';
 
+export const dynamic = 'force-dynamic';
+
 export async function POST(
   request: Request,
   { params }: { params: Promise<{ id: string }> }
@@ -29,7 +31,7 @@ export async function POST(
     }
 
     // Verificar correspondência
-    if (dbSession.password === password) {
+    if (dbSession.password.trim() === password.trim()) {
       return NextResponse.json({ success: true });
     }
 
