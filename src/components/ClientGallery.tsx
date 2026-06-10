@@ -33,11 +33,11 @@ export default function ClientGallery({ session }: ClientGalleryProps) {
   const [showConfirmModal, setShowConfirmModal] = useState(false);
 
   // Carregar fotos do servidor
-  const fetchPhotos = useCallback(async (pwd: string = '') => {
+  const fetchPhotos = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
-      const url = `/api/sessions/${session.id}/photos${pwd ? `?password=${encodeURIComponent(pwd)}` : ''}`;
+      const url = `/api/sessions/${session.id}/photos${password ? `?password=${encodeURIComponent(password)}` : ''}`;
       const response = await fetch(url);
       
       if (!response.ok) {
@@ -54,7 +54,7 @@ export default function ClientGallery({ session }: ClientGalleryProps) {
     } finally {
       setLoading(false);
     }
-  }, [session.id]);
+  }, [session.id, password]);
 
   // Carregar fotos se já estiver autenticado no início
   useEffect(() => {
@@ -83,7 +83,7 @@ export default function ClientGallery({ session }: ClientGalleryProps) {
       }
 
       setIsAuthenticated(true);
-      fetchPhotos(password);
+      // O useEffect vai disparar e chamar fetchPhotos automaticamente com a senha agora que isAuthenticated = true.
     } catch (err: any) {
       setError(err.message || 'Senha incorreta. Tente novamente.');
       setLoading(false);

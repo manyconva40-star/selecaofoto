@@ -242,7 +242,7 @@ export default function SessionDetails({ sessionData, photosData }: SessionDetai
                 >
                   {/* Imagem */}
                   <img
-                    src={`/api/photos/proxy/${photo.drive_file_id}`}
+                    src={photo.thumbnail_url}
                     alt={photo.filename}
                     loading="lazy"
                     className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"

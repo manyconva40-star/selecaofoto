@@ -47,13 +47,7 @@ export async function GET(
       );
     }
 
-    // Construir URL proxy local para cada foto
-    const photosWithProxyUrl = photos.map((photo: any) => ({
-      ...photo,
-      thumbnail_url: `/api/photos/proxy/${photo.drive_file_id}`,
-    }));
-
-    return NextResponse.json(photosWithProxyUrl);
+    return NextResponse.json(photos);
   } catch (error: any) {
     console.error('Erro no endpoint /api/sessions/[id]/photos:', error);
     return NextResponse.json(
