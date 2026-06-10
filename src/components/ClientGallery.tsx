@@ -43,8 +43,11 @@ export default function ClientGallery({ session }: ClientGalleryProps) {
   // Track whether lightbox was opened from thumbnail strip (to restore expanded state on close)
   const [lbOpenedFromSheet, setLbOpenedFromSheet] = useState(false);
 
+  // Fotos visíveis no lightbox quando aberto da sheet:
+  // modo adicional: novas seleções + anteriormente selecionadas;
+  // modo normal: apenas as novas seleções
   const lightboxPhotos = lbOpenedFromSheet
-    ? photos.filter((p) => selectedIds.has(p.id))
+    ? photos.filter((p) => selectedIds.has(p.id) || (isAdditionalMode && previouslySelectedIds.has(p.id)))
     : photos;
 
   const getCoverPosition = () => {
@@ -56,15 +59,17 @@ export default function ClientGallery({ session }: ClientGalleryProps) {
   // Ajustar o índice ativo caso uma foto selecionada seja removida da visualização no lightbox
   useEffect(() => {
     if (activePhotoIndex !== null && lbOpenedFromSheet) {
-      const selectedCount = photos.filter((p) => selectedIds.has(p.id)).length;
-      if (selectedCount === 0) {
+      const visibleCount = photos.filter(
+        (p) => selectedIds.has(p.id) || (isAdditionalMode && previouslySelectedIds.has(p.id))
+      ).length;
+      if (visibleCount === 0) {
         setActivePhotoIndex(null);
         setLbOpenedFromSheet(false);
-      } else if (activePhotoIndex >= selectedCount) {
-        setActivePhotoIndex(selectedCount - 1);
+      } else if (activePhotoIndex >= visibleCount) {
+        setActivePhotoIndex(visibleCount - 1);
       }
     }
-  }, [selectedIds, activePhotoIndex, lbOpenedFromSheet, photos]);
+  }, [selectedIds, activePhotoIndex, lbOpenedFromSheet, photos, isAdditionalMode, previouslySelectedIds]);
 
   // Drag state for bottom sheet
   const sheetDragStart = useRef<number | null>(null);
@@ -660,36 +665,52 @@ export default function ClientGallery({ session }: ClientGalleryProps) {
                 <div className="px-4 pb-2">
                   <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 gap-2">
                     {photos
-                      .filter((p) => selectedIds.has(p.id))
-                      .map((photo) => (
-                        <div
-                          key={photo.id}
-                          className="relative rounded-xl overflow-hidden border-2 border-gold-premium group cursor-pointer transition-transform duration-200 hover:scale-105 active:scale-95 aspect-square"
-                          onClick={() => {
-                            setLbOpenedFromSheet(true);
-                            const selectedPhotos = photos.filter((p) => selectedIds.has(p.id));
-                            setActivePhotoIndex(selectedPhotos.indexOf(photo));
-                          }}
-                        >
-                          <img
-                            src={photo.thumbnail_url}
-                            alt={photo.filename}
-                            draggable={false}
-                            onContextMenu={(e) => e.preventDefault()}
-                            className="w-full h-full object-cover pointer-events-none"
-                          />
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              toggleSelectPhoto(photo.id);
+                      .filter((p) => selectedIds.has(p.id) || (isAdditionalMode && previouslySelectedIds.has(p.id)))
+                      .map((photo) => {
+                        const isPrev = isAdditionalMode && previouslySelectedIds.has(photo.id);
+                        const sheetPhotos = photos.filter(
+                          (p) => selectedIds.has(p.id) || (isAdditionalMode && previouslySelectedIds.has(p.id))
+                        );
+                        return (
+                          <div
+                            key={photo.id}
+                            className={`relative rounded-xl overflow-hidden border-2 group cursor-pointer transition-transform duration-200 hover:scale-105 active:scale-95 aspect-square ${
+                              isPrev ? 'border-zinc-600/50 opacity-70' : 'border-gold-premium'
+                            }`}
+                            onClick={() => {
+                              setLbOpenedFromSheet(true);
+                              setActivePhotoIndex(sheetPhotos.indexOf(photo));
                             }}
-                            className="absolute top-1 right-1 bg-black/70 hover:bg-red-600 rounded-full p-1 opacity-0 group-hover:opacity-100 transition-all cursor-pointer"
-                            title="Remover seleção"
                           >
-                            <X className="w-3 h-3 text-white" />
-                          </button>
-                        </div>
-                      ))}
+                            <img
+                              src={photo.thumbnail_url}
+                              alt={photo.filename}
+                              draggable={false}
+                              onContextMenu={(e) => e.preventDefault()}
+                              className={`w-full h-full object-cover pointer-events-none ${
+                                isPrev ? 'grayscale brightness-75' : ''
+                              }`}
+                            />
+                            {isPrev && (
+                              <div className="absolute bottom-0 left-0 right-0 flex items-center justify-center py-1 bg-black/60">
+                                <CheckCircle2 className="w-3 h-3 text-zinc-400" />
+                              </div>
+                            )}
+                            {!isPrev && (
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  toggleSelectPhoto(photo.id);
+                                }}
+                                className="absolute top-1 right-1 bg-black/70 hover:bg-red-600 rounded-full p-1 opacity-0 group-hover:opacity-100 transition-all cursor-pointer"
+                                title="Remover seleção"
+                              >
+                                <X className="w-3 h-3 text-white" />
+                              </button>
+                            )}
+                          </div>
+                        );
+                      })}
                   </div>
                 </div>
               ) : (
@@ -699,36 +720,47 @@ export default function ClientGallery({ session }: ClientGalleryProps) {
                   style={{ WebkitOverflowScrolling: 'touch' }}
                 >
                   {photos
-                    .filter((p) => selectedIds.has(p.id))
-                    .map((photo) => (
-                      <div
-                        key={photo.id}
-                        className="relative shrink-0 w-14 h-14 rounded-lg overflow-hidden border-2 border-gold-premium group cursor-pointer transition-transform duration-200 hover:scale-105 active:scale-95"
-                        onClick={() => {
-                          setLbOpenedFromSheet(true);
-                          const selectedPhotos = photos.filter((p) => selectedIds.has(p.id));
-                          setActivePhotoIndex(selectedPhotos.indexOf(photo));
-                        }}
-                      >
-                        <img
-                          src={photo.thumbnail_url}
-                          alt={photo.filename}
-                          draggable={false}
-                          onContextMenu={(e) => e.preventDefault()}
-                          className="w-full h-full object-cover pointer-events-none"
-                        />
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            toggleSelectPhoto(photo.id);
+                    .filter((p) => selectedIds.has(p.id) || (isAdditionalMode && previouslySelectedIds.has(p.id)))
+                    .map((photo) => {
+                      const isPrev = isAdditionalMode && previouslySelectedIds.has(photo.id);
+                      const sheetPhotos = photos.filter(
+                        (p) => selectedIds.has(p.id) || (isAdditionalMode && previouslySelectedIds.has(p.id))
+                      );
+                      return (
+                        <div
+                          key={photo.id}
+                          className={`relative shrink-0 w-14 h-14 rounded-lg overflow-hidden border-2 group cursor-pointer transition-transform duration-200 hover:scale-105 active:scale-95 ${
+                            isPrev ? 'border-zinc-600/50 opacity-70' : 'border-gold-premium'
+                          }`}
+                          onClick={() => {
+                            setLbOpenedFromSheet(true);
+                            setActivePhotoIndex(sheetPhotos.indexOf(photo));
                           }}
-                          className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center cursor-pointer"
-                          title="Remover seleção"
                         >
-                          <X className="w-4 h-4 text-white" />
-                        </button>
-                      </div>
-                    ))}
+                          <img
+                            src={photo.thumbnail_url}
+                            alt={photo.filename}
+                            draggable={false}
+                            onContextMenu={(e) => e.preventDefault()}
+                            className={`w-full h-full object-cover pointer-events-none ${
+                              isPrev ? 'grayscale brightness-75' : ''
+                            }`}
+                          />
+                          {!isPrev && (
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                toggleSelectPhoto(photo.id);
+                              }}
+                              className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center cursor-pointer"
+                              title="Remover seleção"
+                            >
+                              <X className="w-4 h-4 text-white" />
+                            </button>
+                          )}
+                        </div>
+                      );
+                    })}
                 </div>
               )}
             </div>
@@ -847,19 +879,27 @@ export default function ClientGallery({ session }: ClientGalleryProps) {
 
           {/* Footer Lightbox */}
           <div className="h-24 px-4 flex flex-col items-center justify-center gap-2 bg-gradient-to-t from-black/80 to-transparent pb-4">
-            <button
-              onClick={() => toggleSelectPhoto(lightboxPhotos[activePhotoIndex].id)}
-              className={`flex items-center gap-2 px-6 py-3.5 rounded-full font-medium text-sm transition-all duration-300 active:scale-95 cursor-pointer shadow-md ${
-                selectedIds.has(lightboxPhotos[activePhotoIndex].id)
-                  ? 'bg-gold-premium text-zinc-950 scale-105'
-                  : 'bg-zinc-800 text-white hover:bg-zinc-700'
-              }`}
-            >
-              <Heart className={`w-4 h-4 ${selectedIds.has(lightboxPhotos[activePhotoIndex].id) ? 'fill-zinc-950' : 'fill-none'}`} />
-              <span>
-                {selectedIds.has(lightboxPhotos[activePhotoIndex].id) ? 'Selecionada' : 'Selecionar Foto'}
-              </span>
-            </button>
+            {isAdditionalMode && previouslySelectedIds.has(lightboxPhotos[activePhotoIndex].id) ? (
+              /* Foto já selecionada anteriormente — só mostra badge informativo */
+              <div className="flex items-center gap-2 px-6 py-3.5 rounded-full font-medium text-sm bg-zinc-800/80 border border-zinc-600/50 text-zinc-400 shadow-md">
+                <CheckCircle2 className="w-4 h-4" />
+                <span>Já selecionada anteriormente</span>
+              </div>
+            ) : (
+              <button
+                onClick={() => toggleSelectPhoto(lightboxPhotos[activePhotoIndex].id)}
+                className={`flex items-center gap-2 px-6 py-3.5 rounded-full font-medium text-sm transition-all duration-300 active:scale-95 cursor-pointer shadow-md ${
+                  selectedIds.has(lightboxPhotos[activePhotoIndex].id)
+                    ? 'bg-gold-premium text-zinc-950 scale-105'
+                    : 'bg-zinc-800 text-white hover:bg-zinc-700'
+                }`}
+              >
+                <Heart className={`w-4 h-4 ${selectedIds.has(lightboxPhotos[activePhotoIndex].id) ? 'fill-zinc-950' : 'fill-none'}`} />
+                <span>
+                  {selectedIds.has(lightboxPhotos[activePhotoIndex].id) ? 'Selecionada' : 'Selecionar Foto'}
+                </span>
+              </button>
+            )}
           </div>
         </div>
       )}
