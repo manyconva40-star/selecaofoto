@@ -99,11 +99,6 @@ export default function ClientGallery({ session }: ClientGalleryProps) {
       if (newSet.has(photoId)) {
         newSet.delete(photoId);
       } else {
-        // Verificar limite
-        if (newSet.size >= session.max_photos) {
-          alert(`Limite máximo atingido! Você só pode selecionar até ${session.max_photos} fotos.`);
-          return prev;
-        }
         newSet.add(photoId);
       }
       return newSet;
@@ -297,7 +292,7 @@ export default function ClientGallery({ session }: ClientGalleryProps) {
                 Selecione suas fotos favoritas
               </h2>
               <p className="text-text-muted text-xs sm:text-sm font-light mt-1.5 leading-relaxed">
-                Clique na foto para ver em tela cheia. Clique no coração para selecionar. Escolha até **{session.max_photos}** fotos.
+                Clique na foto para ver em tela cheia. Clique no coração para selecionar.
               </p>
             </div>
 
@@ -355,21 +350,13 @@ export default function ClientGallery({ session }: ClientGalleryProps) {
       {photos.length > 0 && (
         <div className="fixed bottom-0 left-0 right-0 bg-dark-card/90 backdrop-blur-md border-t border-dark-border z-25 py-5">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col sm:flex-row items-center justify-between gap-4">
-            <div className="text-center sm:text-left">
+            <div className="text-center sm:text-left flex-1">
               <span className="block text-xs uppercase tracking-wider text-text-muted mb-0.5">
-                Progresso da seleção
+                Fotos Escolhidas
               </span>
               <span className="font-serif text-lg font-bold text-white">
-                <span className="text-gold-premium">{selectedIds.size}</span> de {session.max_photos} selecionadas
+                <span className="text-gold-premium">{selectedIds.size}</span> foto{selectedIds.size !== 1 ? 's' : ''}
               </span>
-            </div>
-
-            {/* Barra de preenchimento */}
-            <div className="w-full sm:w-64 bg-zinc-800 h-1.5 rounded-full overflow-hidden shrink-0">
-              <div 
-                className="bg-gold-premium h-full transition-all duration-300"
-                style={{ width: `${Math.min((selectedIds.size / session.max_photos) * 100, 100)}%` }}
-              />
             </div>
 
             <button
