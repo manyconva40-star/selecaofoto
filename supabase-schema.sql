@@ -5,6 +5,7 @@
 CREATE TABLE IF NOT EXISTS sessions (
   id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
   photographer_id TEXT NOT NULL,       -- e-mail do fotógrafo (do Google OAuth)
+  photographer_name TEXT,              -- nome do fotógrafo/estúdio
   client_name TEXT NOT NULL,
   session_date DATE,
   password TEXT,                       -- senha da galeria (hash bcrypt ou plain para MVP)
@@ -12,6 +13,7 @@ CREATE TABLE IF NOT EXISTS sessions (
   share_token TEXT UNIQUE,            -- token público para link da galeria
   max_selections INTEGER DEFAULT 0,   -- 0 = sem limite
   status TEXT DEFAULT 'active',       -- active | closed
+  cover_image_url TEXT,               -- URL da foto de capa (hero banner)
   created_at TIMESTAMPTZ DEFAULT NOW(),
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );

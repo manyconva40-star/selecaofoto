@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { 
   Lock, Heart, X, ChevronLeft, 
-  ChevronRight, CheckCircle2, AlertCircle, Loader2 
+  ChevronRight, CheckCircle2, AlertCircle, Loader2, ShieldAlert
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
 
@@ -17,6 +17,9 @@ interface ClientGalleryProps {
     status: string;
     photographer_id: string;
     reviewToken?: string;
+    cover_image_url?: string;
+    photographer_name?: string;
+    isAdditionalMode?: boolean;
   };
 }
 
@@ -26,12 +29,121 @@ export default function ClientGallery({ session }: ClientGalleryProps) {
   const [photos, setPhotos] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  // IDs das fotos já selecionadas anteriormente (visíveis em P&B no modo adicional)
+  const [previouslySelectedIds, setPreviouslySelectedIds] = useState<Set<string>>(new Set());
   const [activePhotoIndex, setActivePhotoIndex] = useState<number | null>(null);
   
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isSuccess, setIsSuccess] = useState(session.status === 'closed');
   const [showConfirmModal, setShowConfirmModal] = useState(false);
+  const [showCopyrightWarning, setShowCopyrightWarning] = useState(false);
+
+  const isAdditionalMode = session.isAdditionalMode === true;
+
+  // Calcular excedente de fotos
+  const packageLimit = session.max_photos || 0;
+  const overLimit = packageLimit > 0 ? Math.max(0, selectedIds.size - packageLimit) : 0;
+  const isOverLimit = overLimit > 0;
+
+  // Proteção contra Printscreen, Impressão e Cópia
+  useEffect(() => {
+    // 1. Bloquear perda de foco (captura printscreen de celular/PC)
+    const handleBlur = () => {
+      if (isAuthenticated && !isSuccess) {
+        setShowCopyrightWarning(true);
+      }
+    };
+
+    // 2. Bloquear teclas de printscreen, impressão e ferramentas de dev
+    const handleKeyDownProtection = (e: KeyboardEvent) => {
+      if (!isAuthenticated || isSuccess) return;
+
+      const isMac = typeof window !== 'undefined' && navigator.platform.toUpperCase().indexOf('MAC') >= 0;
+      const cmdOrCtrl = isMac ? e.metaKey : e.ctrlKey;
+
+      // Tecla PrintScreen / PrtScn
+      if (e.key === 'PrintScreen' || e.key === 'PrtScn' || e.keyCode === 44) {
+        e.preventDefault();
+        setShowCopyrightWarning(true);
+        try {
+          navigator.clipboard.writeText('Galeria Protegida © - Cópia Proibida');
+        } catch (_) {}
+        return;
+      }
+
+      // Ctrl+P ou Cmd+P (Imprimir)
+      if (cmdOrCtrl && (e.key === 'p' || e.key === 'P')) {
+        e.preventDefault();
+        setShowCopyrightWarning(true);
+        return;
+      }
+
+      // Ctrl+S ou Cmd+S (Salvar página)
+      if (cmdOrCtrl && (e.key === 's' || e.key === 'S')) {
+        e.preventDefault();
+        setShowCopyrightWarning(true);
+        return;
+      }
+
+      // F12 ou Ctrl+Shift+I / Cmd+Opt+I (Ferramentas de desenvolvedor)
+      if (
+        e.key === 'F12' ||
+        (cmdOrCtrl && e.shiftKey && (e.key === 'i' || e.key === 'I')) ||
+        (cmdOrCtrl && e.shiftKey && (e.key === 'j' || e.key === 'J'))
+      ) {
+        e.preventDefault();
+        setShowCopyrightWarning(true);
+        return;
+      }
+
+      // Ctrl+U / Cmd+Opt+U (Código fonte)
+      if (cmdOrCtrl && (e.key === 'u' || e.key === 'U')) {
+        e.preventDefault();
+        setShowCopyrightWarning(true);
+        return;
+      }
+    };
+
+    // 3. Bloquear botão direito (menu de contexto)
+    const handleContextMenu = (e: MouseEvent) => {
+      if (isAuthenticated && !isSuccess) {
+        e.preventDefault();
+      }
+    };
+
+    // 4. Bloquear cópia e recorte de tela
+    const handleCopy = (e: ClipboardEvent) => {
+      if (isAuthenticated && !isSuccess) {
+        e.preventDefault();
+        setShowCopyrightWarning(true);
+      }
+    };
+
+    // 5. Bloquear arrastar imagens
+    const handleDragStart = (e: DragEvent) => {
+      if (isAuthenticated && !isSuccess) {
+        e.preventDefault();
+      }
+    };
+
+    window.addEventListener('blur', handleBlur);
+    window.addEventListener('keydown', handleKeyDownProtection, true);
+    document.addEventListener('contextmenu', handleContextMenu);
+    document.addEventListener('copy', handleCopy);
+    document.addEventListener('cut', handleCopy);
+    document.addEventListener('dragstart', handleDragStart);
+
+    return () => {
+      window.removeEventListener('blur', handleBlur);
+      window.removeEventListener('keydown', handleKeyDownProtection, true);
+      document.removeEventListener('contextmenu', handleContextMenu);
+      document.removeEventListener('copy', handleCopy);
+      document.removeEventListener('cut', handleCopy);
+      document.removeEventListener('dragstart', handleDragStart);
+    };
+  }, [isAuthenticated, isSuccess]);
+
 
   // Carregar fotos do servidor
   const fetchPhotos = useCallback(async () => {
@@ -50,7 +162,14 @@ export default function ClientGallery({ session }: ClientGalleryProps) {
       if (data && typeof data === 'object' && !Array.isArray(data)) {
         setPhotos(data.photos || []);
         if (data.selectedPhotoIds) {
-          setSelectedIds(new Set(data.selectedPhotoIds));
+          if (isAdditionalMode) {
+            // Em modo adicional: fotos antigas ficam em P&B (previouslySelectedIds)
+            // e a nova seleção começa vazia
+            setPreviouslySelectedIds(new Set(data.selectedPhotoIds));
+            setSelectedIds(new Set());
+          } else {
+            setSelectedIds(new Set(data.selectedPhotoIds));
+          }
         }
       } else {
         setPhotos(Array.isArray(data) ? data : []);
@@ -61,7 +180,7 @@ export default function ClientGallery({ session }: ClientGalleryProps) {
     } finally {
       setLoading(false);
     }
-  }, [session.id, password]);
+  }, [session.id, password, isAdditionalMode]);
 
   // Carregar fotos se já estiver autenticado no início
   useEffect(() => {
@@ -100,6 +219,8 @@ export default function ClientGallery({ session }: ClientGalleryProps) {
   // Alternar seleção da foto
   const toggleSelectPhoto = (photoId: string) => {
     if (session.status === 'closed') return;
+    // Em modo adicional, fotos já selecionadas não podem ser alteradas
+    if (isAdditionalMode && previouslySelectedIds.has(photoId)) return;
 
     setSelectedIds((prev) => {
       const newSet = new Set(prev);
@@ -180,16 +301,15 @@ export default function ClientGallery({ session }: ClientGalleryProps) {
             Seleção Finalizada!
           </h1>
           <p className="text-text-muted text-sm leading-relaxed font-light">
-            Olá, <strong>{session.client_name}</strong>! Suas fotos escolhidas foram enviadas com sucesso para o fotógrafo.
+            Oi, deusa, já recebi suas fotos selecionadas e em breve entro em contato com você.
           </p>
           <div className="bg-zinc-900/50 p-4 border border-dark-border rounded-lg text-left text-xs space-y-2">
-            <p className="text-zinc-300 font-medium">Resumo do Envio:</p>
-            <p className="text-text-muted"><strong>Fotos selecionadas:</strong> {selectedIds.size} fotos</p>
-            <p className="text-text-muted"><strong>Status:</strong> Seleção Concluída (E-mail enviado)</p>
+            <p className="text-zinc-300 font-medium">Resumo:</p>
+            <p className="text-text-muted"><strong>Total de fotos:</strong> {selectedIds.size}</p>
+            {overLimit > 0 && (
+              <p className="text-text-muted"><strong>Adicionais:</strong> {overLimit}</p>
+            )}
           </div>
-          <p className="text-gold-premium text-xs font-medium pt-2">
-            O fotógrafo já foi notificado e entrará em contato em breve. Obrigado!
-          </p>
         </div>
       </div>
     );
@@ -253,18 +373,50 @@ export default function ClientGallery({ session }: ClientGalleryProps) {
     );
   }
 
-  // Calcular excedente de fotos
-  const packageLimit = session.max_photos || 0;
-  const overLimit = packageLimit > 0 ? Math.max(0, selectedIds.size - packageLimit) : 0;
-  const isOverLimit = overLimit > 0;
+
 
   return (
     <div
       className="min-h-screen bg-dark-bg text-foreground flex flex-col font-sans"
       style={{ userSelect: 'none', WebkitUserSelect: 'none' }}
     >
+      {/* Banner de Imersão/Capa (se houver) */}
+      {session.cover_image_url && (
+        <div className="relative w-full h-[85vh] md:h-screen flex flex-col items-center justify-center overflow-hidden">
+          {/* Imagem de Fundo */}
+          <div className="absolute inset-0 z-0">
+            <img
+              src={session.cover_image_url}
+              alt="Capa da Galeria"
+              className="w-full h-full object-cover pointer-events-none select-none"
+            />
+            {/* Gradiente escuro para contraste e legibilidade */}
+            <div className="absolute inset-0 bg-black/45 backdrop-brightness-[0.9] bg-gradient-to-b from-black/30 via-black/25 to-dark-bg" />
+          </div>
+
+          {/* Conteúdo Textual Centralizado */}
+          <div className="relative z-10 flex flex-col items-center text-center px-4 max-w-3xl mx-auto space-y-6">
+            <span className="font-sans text-[10px] sm:text-xs font-semibold tracking-[0.35em] text-zinc-350 uppercase animate-fade-in">
+              {session.photographer_name || 'Fotógrafo'}
+            </span>
+            <h1 className="font-serif text-4xl sm:text-6xl md:text-7xl font-extralight text-white tracking-widest uppercase drop-shadow-xl leading-tight select-none">
+              {session.client_name}
+            </h1>
+            
+            <button
+              onClick={() => {
+                document.getElementById('gallery-grid')?.scrollIntoView({ behavior: 'smooth' });
+              }}
+              className="mt-8 border border-white hover:border-gold-premium hover:bg-gold-premium hover:text-zinc-950 text-white font-serif tracking-[0.2em] text-[10px] sm:text-xs uppercase px-8 py-3.5 rounded-none transition-all duration-300 cursor-pointer shadow-lg active:scale-95 hover:scale-103"
+            >
+              Ver Galeria
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Header Cliente */}
-      <header className="border-b border-dark-border bg-dark-card/30 backdrop-blur-md sticky top-0 z-20">
+      <header id="gallery-grid" className="border-b border-dark-border bg-dark-card/30 backdrop-blur-md sticky top-0 z-20">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-20 flex items-center justify-between">
           <div>
             <span className="font-serif text-lg text-white font-medium">{session.client_name}</span>
@@ -273,7 +425,7 @@ export default function ClientGallery({ session }: ClientGalleryProps) {
       </header>
 
       {/* Galeria Grid */}
-      <main className="flex-grow max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-10 pb-32">
+      <main className="flex-grow max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-10 pb-48">
         {error ? (
           <div className="max-w-md mx-auto text-center py-12 p-6 bg-red-500/10 border border-red-500/20 rounded-xl text-red-400">
             <AlertCircle className="w-10 h-10 mx-auto mb-3" />
@@ -293,11 +445,19 @@ export default function ClientGallery({ session }: ClientGalleryProps) {
           <div>
             {/* Boas vindas cliente */}
             <div className="mb-8 border-b border-dark-border/40 pb-6 text-center sm:text-left">
+              {isAdditionalMode && (
+                <div className="inline-flex items-center gap-2 mb-3 px-3 py-1.5 rounded-full bg-gold-premium/10 border border-gold-premium/30 text-gold-premium text-xs font-semibold tracking-wide">
+                  <span className="w-1.5 h-1.5 rounded-full bg-gold-premium animate-pulse" />
+                  Modo Fotos Adicionais
+                </div>
+              )}
               <h2 className="font-serif text-2xl sm:text-3xl font-medium text-white">
-                Selecione suas fotos favoritas
+                {isAdditionalMode ? 'Selecione suas fotos adicionais' : 'Selecione suas fotos favoritas'}
               </h2>
               <p className="text-text-muted text-xs sm:text-sm font-light mt-1.5 leading-relaxed">
-                Clique na foto para ver em tela cheia. Clique no coração para selecionar.
+                {isAdditionalMode
+                  ? 'As fotos em preto e branco já foram selecionadas. Escolha apenas as novas fotos que deseja adicionar.'
+                  : 'Clique na foto para ver em tela cheia. Clique no coração para selecionar.'}
               </p>
             </div>
 
@@ -305,49 +465,71 @@ export default function ClientGallery({ session }: ClientGalleryProps) {
             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
               {photos.map((photo, index) => {
                 const isSelected = selectedIds.has(photo.id);
+                const isPrevious = isAdditionalMode && previouslySelectedIds.has(photo.id);
 
                 return (
                   <div
                     key={photo.id}
-                    className={`bg-dark-card border rounded-xl overflow-hidden aspect-square transition-all duration-300 relative group cursor-pointer ${
-                      isSelected 
-                        ? 'border-gold-premium ring-1 ring-gold-premium' 
-                        : 'border-dark-border/70 hover:border-zinc-650'
+                    className={`bg-dark-card border rounded-xl overflow-hidden aspect-square transition-all duration-300 relative group ${
+                      isPrevious
+                        ? 'border-zinc-700/50 cursor-default opacity-70'
+                        : isSelected
+                          ? 'border-gold-premium ring-1 ring-gold-premium cursor-pointer'
+                          : 'border-dark-border/70 hover:border-zinc-650 cursor-pointer'
                     }`}
                   >
                     {/* Imagem do grid com proteção anti-print */}
-                    <div className="relative w-full h-full" onClick={() => setActivePhotoIndex(index)}>
+                    <div
+                      className="relative w-full h-full"
+                      onClick={() => !isPrevious && setActivePhotoIndex(index)}
+                    >
                       <img
                         src={photo.thumbnail_url}
                         alt={photo.filename}
                         loading="lazy"
                         draggable={false}
                         onContextMenu={(e) => e.preventDefault()}
-                        className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-103 pointer-events-none"
+                        className={`w-full h-full object-cover transition-all duration-500 pointer-events-none ${
+                          isPrevious
+                            ? 'grayscale brightness-75'
+                            : 'group-hover:scale-103'
+                        }`}
                       />
                       {/* Overlay anti-screenshot transparente */}
                       <div className="absolute inset-0" style={{ background: 'transparent' }} />
                     </div>
 
-                    {/* Botão de coração de seleção */}
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation(); // Evita abrir o lightbox ao selecionar
-                        toggleSelectPhoto(photo.id);
-                      }}
-                      className={`absolute top-2.5 right-2.5 p-2 rounded-full shadow-md z-10 transition-all duration-300 active:scale-90 cursor-pointer ${
-                        isSelected
-                          ? 'bg-gold-premium text-zinc-950 scale-105'
-                          : 'bg-black/60 text-white hover:bg-black/80 opacity-90 group-hover:opacity-100'
-                      }`}
-                    >
-                      <Heart className={`w-4 h-4 ${isSelected ? 'fill-zinc-950' : 'fill-none'}`} />
-                    </button>
+                    {/* Badge "Já Selecionada" para modo adicional */}
+                    {isPrevious && (
+                      <div className="absolute top-2 left-2 flex items-center gap-1 px-2 py-1 rounded-full bg-black/70 border border-zinc-600/50 text-zinc-400 text-[10px] font-semibold tracking-wide z-10">
+                        <CheckCircle2 className="w-3 h-3 shrink-0" />
+                        <span>Já selecionada</span>
+                      </div>
+                    )}
+
+                    {/* Botão de coração de seleção (oculto para fotos já selecionadas) */}
+                    {!isPrevious && (
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          toggleSelectPhoto(photo.id);
+                        }}
+                        className={`absolute top-2.5 right-2.5 p-2 rounded-full shadow-md z-10 transition-all duration-300 active:scale-90 cursor-pointer ${
+                          isSelected
+                            ? 'bg-gold-premium text-zinc-950 scale-105'
+                            : 'bg-black/60 text-white hover:bg-black/80 opacity-90 group-hover:opacity-100'
+                        }`}
+                      >
+                        <Heart className={`w-4 h-4 ${isSelected ? 'fill-zinc-950' : 'fill-none'}`} />
+                      </button>
+                    )}
 
                     {/* Nome do arquivo sutil overlay ao hover */}
-                    <div className="absolute bottom-0 left-0 right-0 p-2 bg-gradient-to-t from-black/80 to-transparent opacity-0 group-hover:opacity-100 transition-opacity text-[10px] text-zinc-300 truncate">
-                      {photo.filename}
-                    </div>
+                    {!isPrevious && (
+                      <div className="absolute bottom-0 left-0 right-0 p-2 bg-gradient-to-t from-black/80 to-transparent opacity-0 group-hover:opacity-100 transition-opacity text-[10px] text-zinc-300 truncate">
+                        {photo.filename}
+                      </div>
+                    )}
                   </div>
                 );
               })}
@@ -358,8 +540,49 @@ export default function ClientGallery({ session }: ClientGalleryProps) {
 
       {/* Barra de Progresso Inferior Fixa */}
       {photos.length > 0 && (
-        <div className="fixed bottom-0 left-0 right-0 bg-dark-card/90 backdrop-blur-md border-t border-dark-border z-25 py-5">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col sm:flex-row items-center justify-between gap-4">
+        <div className="fixed bottom-0 left-0 right-0 bg-dark-card/95 backdrop-blur-md border-t border-dark-border z-25">
+
+          {/* Faixa de Miniaturas das Fotos Selecionadas */}
+          {selectedIds.size > 0 && (
+            <div className="border-b border-dark-border/50">
+              <div
+                className="flex gap-2 px-4 py-2.5 overflow-x-auto no-scrollbar"
+                style={{ WebkitOverflowScrolling: 'touch' }}
+              >
+                {photos
+                  .filter((p) => selectedIds.has(p.id))
+                  .map((photo) => (
+                    <div
+                      key={photo.id}
+                      className="relative shrink-0 w-14 h-14 rounded-lg overflow-hidden border-2 border-gold-premium group cursor-pointer transition-transform duration-200 hover:scale-105 active:scale-95"
+                      onClick={() => setActivePhotoIndex(photos.indexOf(photo))}
+                    >
+                      <img
+                        src={photo.thumbnail_url}
+                        alt={photo.filename}
+                        draggable={false}
+                        onContextMenu={(e) => e.preventDefault()}
+                        className="w-full h-full object-cover pointer-events-none"
+                      />
+                      {/* Botão de remover ao hover */}
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          toggleSelectPhoto(photo.id);
+                        }}
+                        className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center cursor-pointer"
+                        title="Remover seleção"
+                      >
+                        <X className="w-4 h-4 text-white" />
+                      </button>
+                    </div>
+                  ))}
+              </div>
+            </div>
+          )}
+
+          {/* Contador e Botão Finalizar */}
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col sm:flex-row items-center justify-between gap-3 py-4">
             <div className="text-center sm:text-left flex-1">
               <span className="block text-xs uppercase tracking-wider text-text-muted mb-0.5">
                 Selecionadas
@@ -400,6 +623,7 @@ export default function ClientGallery({ session }: ClientGalleryProps) {
           </div>
         </div>
       )}
+
 
       {/* Lightbox / Visualização em Tela Cheia */}
       {activePhotoIndex !== null && (
@@ -501,6 +725,41 @@ export default function ClientGallery({ session }: ClientGalleryProps) {
                 Confirmar e Enviar
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal/Overlay de Proteção de Direitos Autorais */}
+      {showCopyrightWarning && (
+        <div className="fixed inset-0 bg-black/95 backdrop-blur-md z-[100] flex items-center justify-center p-4 animate-fade-in select-none">
+          <div className="bg-dark-card border border-gold-premium/30 p-8 sm:p-10 rounded-2xl max-w-md w-full space-y-6 shadow-2xl text-center relative overflow-hidden">
+            {/* Brilho dourado premium de fundo */}
+            <div className="absolute -top-10 -left-10 w-40 h-40 bg-gold-premium/5 rounded-full blur-3xl pointer-events-none" />
+            <div className="absolute -bottom-10 -right-10 w-40 h-40 bg-gold-premium/5 rounded-full blur-3xl pointer-events-none" />
+
+            <div className="w-16 h-16 bg-gold-premium/15 text-gold-premium rounded-full flex items-center justify-center mx-auto ring-1 ring-gold-premium/30">
+              <ShieldAlert className="w-8 h-8" />
+            </div>
+
+            <div className="space-y-3">
+              <h3 className="font-serif text-2xl font-semibold text-white tracking-tight">
+                Proteção de Direitos Autorais
+              </h3>
+              <p className="text-text-muted text-sm font-light leading-relaxed">
+                Esta galeria é protegida contra cópias e capturas de tela (printscreen). 
+                Para garantir a melhor qualidade e integridade do ensaio de <strong className="text-white">{session.client_name}</strong>, use os botões de seleção da plataforma.
+              </p>
+              <p className="text-gold-premium/90 text-xs font-medium bg-gold-premium/5 border border-gold-premium/20 py-2.5 px-3 rounded-lg">
+                Prints e capturas não autorizadas violam os termos de serviço e a propriedade intelectual do fotógrafo.
+              </p>
+            </div>
+
+            <button
+              onClick={() => setShowCopyrightWarning(false)}
+              className="w-full bg-gold-premium hover:bg-gold-premium-hover text-zinc-950 font-bold py-3.5 rounded-lg text-sm transition-all duration-300 shadow-md shadow-gold-premium/10 hover:shadow-gold-premium/20 active:scale-98 cursor-pointer"
+            >
+              Continuar na Galeria
+            </button>
           </div>
         </div>
       )}

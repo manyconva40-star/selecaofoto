@@ -22,6 +22,7 @@ export async function POST(request: Request) {
     const formData = await request.formData();
     const file = formData.get('file') as File;
     const sessionId = formData.get('sessionId') as string;
+    const isCover = formData.get('isCover') === 'true';
 
     if (!file || !sessionId) {
       return NextResponse.json(
@@ -67,6 +68,24 @@ export async function POST(request: Request) {
       file.type,
       buffer
     );
+
+    // Se for foto de capa, atualiza a sessão e encerra
+    if (isCover) {
+      const { error: updateError } = await supabaseAdmin
+        .from('sessions')
+        .update({ cover_image_url: uploadResult.url })
+        .eq('id', sessionId);
+
+      if (updateError) {
+        console.error('Erro ao salvar imagem de capa no banco:', updateError);
+        return NextResponse.json(
+          { error: `Erro ao salvar imagem de capa no banco: ${updateError.message}` },
+          { status: 500 }
+        );
+      }
+
+      return NextResponse.json({ cover_image_url: uploadResult.url });
+    }
 
     // 7. Inserir metadados da foto no Supabase
     const { data: dbPhoto, error: photoError } = await supabaseAdmin

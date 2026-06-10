@@ -7,17 +7,17 @@ export const revalidate = 0; // Evita cache
 
 interface PageProps {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ token?: string }>;
+  searchParams: Promise<{ token?: string; modo?: string }>;
 }
 
 export default async function ClientGalleryPage({ params, searchParams }: PageProps) {
   const { id } = await params;
-  const { token } = await searchParams;
+  const { token, modo } = await searchParams;
 
   // 1. Buscar metadados essenciais da sessão no Supabase (sem carregar a senha real no HTML inicial)
   const { data: dbSession, error } = await supabaseAdmin
     .from('sessions')
-    .select('id, client_name, session_date, max_selections, status, photographer_id, password, review_token')
+    .select('id, client_name, session_date, max_selections, status, photographer_id, password, review_token, cover_image_url, photographer_name')
     .eq('id', id)
     .single();
 
@@ -58,6 +58,9 @@ export default async function ClientGalleryPage({ params, searchParams }: PagePr
     status: isReopened ? 'active' : dbSession.status,
     photographer_id: dbSession.photographer_id,
     reviewToken: isReopened ? token : undefined,
+    cover_image_url: dbSession.cover_image_url,
+    photographer_name: dbSession.photographer_name,
+    isAdditionalMode: isReopened && modo === 'adicional',
   };
 
   return <ClientGallery session={sanitizedSession} />;

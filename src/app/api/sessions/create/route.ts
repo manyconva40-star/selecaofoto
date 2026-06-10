@@ -56,6 +56,7 @@ export async function POST(request: Request) {
           password: password || null,
           drive_folder_id: folderId,
           photographer_id: photographerEmail,
+          photographer_name: photographerName,
           status: 'active',
         },
       ])

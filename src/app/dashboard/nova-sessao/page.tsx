@@ -39,6 +39,29 @@ export default function NovaSessaoPage() {
   const [createdSessionId, setCreatedSessionId] = useState<string | null>(null);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const coverInputRef = useRef<HTMLInputElement>(null);
+  const [coverFile, setCoverFile] = useState<File | null>(null);
+  const [coverPreview, setCoverPreview] = useState<string | null>(null);
+
+  const handleCoverChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files[0]) {
+      const file = e.target.files[0];
+      if (!file.type.startsWith('image/')) {
+        alert('Por favor, selecione uma imagem para a capa.');
+        return;
+      }
+      setCoverFile(file);
+      setCoverPreview(URL.createObjectURL(file));
+    }
+  };
+
+  const handleRemoveCover = () => {
+    setCoverFile(null);
+    if (coverPreview) {
+      URL.revokeObjectURL(coverPreview);
+      setCoverPreview(null);
+    }
+  };
 
   // Redireciona se não estiver logado
   if (authStatus === 'unauthenticated') {
@@ -120,6 +143,30 @@ export default function NovaSessaoPage() {
 
       const createdSession = await sessionResponse.json();
       setCreatedSessionId(createdSession.id);
+
+      // 1.5. Fazer upload da foto de capa se houver
+      if (coverFile) {
+        try {
+          const resizedCover = await resizeImageIfNeeded(coverFile, 1600);
+          const coverFormData = new FormData();
+          coverFormData.append('file', resizedCover);
+          coverFormData.append('sessionId', createdSession.id);
+          coverFormData.append('isCover', 'true');
+
+          const coverResponse = await fetch('/api/photos/upload', {
+            method: 'POST',
+            body: coverFormData,
+          });
+
+          if (!coverResponse.ok) {
+            const coverErr = await coverResponse.json();
+            throw new Error(coverErr.error || 'Erro no upload da foto de capa.');
+          }
+        } catch (coverError: any) {
+          console.error('Erro ao subir foto de capa:', coverError);
+          throw new Error(`Erro ao enviar foto de capa: ${coverError.message}`);
+        }
+      }
 
       // 2. Fazer upload das fotos uma a uma com redimensionamento
       const totalFiles = uploadQueue.length;
@@ -333,6 +380,62 @@ export default function NovaSessaoPage() {
                       disabled={isSubmitting}
                       className="w-full bg-zinc-900 border border-dark-border rounded-lg px-4 py-3 text-sm focus:outline-none focus:border-gold-premium text-white transition-colors"
                     />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-semibold uppercase tracking-wider text-text-muted mb-2">
+                      Foto de Capa da Galeria (Opcional)
+                    </label>
+                    <input
+                      type="file"
+                      ref={coverInputRef}
+                      accept="image/*"
+                      onChange={handleCoverChange}
+                      disabled={isSubmitting}
+                      className="hidden"
+                    />
+                    
+                    {coverPreview ? (
+                      <div className="relative rounded-lg overflow-hidden border border-dark-border bg-zinc-900 aspect-video group">
+                        <img 
+                          src={coverPreview} 
+                          alt="Previa da capa" 
+                          className="w-full h-full object-cover" 
+                        />
+                        <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
+                          <button
+                            type="button"
+                            onClick={() => coverInputRef.current?.click()}
+                            className="bg-zinc-900/80 hover:bg-zinc-950 text-white p-2.5 rounded-lg text-xs font-medium border border-dark-border cursor-pointer transition-colors"
+                          >
+                            Alterar
+                          </button>
+                          <button
+                            type="button"
+                            onClick={handleRemoveCover}
+                            className="bg-red-950/80 hover:bg-red-900 text-red-400 p-2.5 rounded-lg text-xs font-medium border border-red-500/20 cursor-pointer transition-colors flex items-center gap-1"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                            <span>Remover</span>
+                          </button>
+                        </div>
+                      </div>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => coverInputRef.current?.click()}
+                        disabled={isSubmitting}
+                        className="w-full border border-dashed border-dark-border hover:border-gold-premium/50 rounded-lg p-5 flex flex-col items-center justify-center text-center cursor-pointer transition-all duration-300 bg-zinc-900/20 hover:bg-zinc-900/40"
+                      >
+                        <Upload className="w-6 h-6 text-gold-premium/70 mb-2" />
+                        <span className="text-white text-xs font-medium block">
+                          Selecionar foto de capa (Formato horizontal)
+                        </span>
+                        <span className="text-text-muted text-[10px] font-light mt-1">
+                          Imagem principal de boas vindas para imersão da cliente.
+                        </span>
+                      </button>
+                    )}
                   </div>
                 </div>
               </div>
