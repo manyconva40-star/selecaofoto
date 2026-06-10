@@ -138,69 +138,70 @@ export default function SessionDetails({ sessionData, photosData }: SessionDetai
             </div>
 
             {/* Ações Rápidas */}
-            <div className="flex flex-col sm:flex-row gap-3 lg:self-center shrink-0">
+            <div className="flex flex-col gap-3 lg:self-center shrink-0 w-full sm:w-auto">
+              <div className="flex flex-col sm:flex-row gap-3">
+                {/* Toggle + Botão de Copiar Link agrupados */}
+                <div className="flex items-stretch gap-0 rounded-lg overflow-hidden border border-dark-border">
+                  <button
+                    onClick={handleCopyLink}
+                    className={`flex items-center justify-center gap-2 px-5 py-3 font-medium text-sm transition-all cursor-pointer ${
+                      copySuccess
+                        ? 'bg-emerald-500/10 text-emerald-400'
+                        : 'bg-zinc-900/50 hover:bg-zinc-800 text-white'
+                    }`}
+                  >
+                    <LinkIcon className="w-4 h-4 text-gold-premium" />
+                    <span>{copySuccess ? 'Link Copiado!' : 'Copiar Link da Cliente'}</span>
+                  </button>
 
-              {/* Toggle + Botão de Copiar Link agrupados */}
-              <div className="flex items-stretch gap-0 rounded-lg overflow-hidden border border-dark-border">
-                <button
-                  onClick={handleCopyLink}
-                  className={`flex items-center justify-center gap-2 px-5 py-3 font-medium text-sm transition-all cursor-pointer ${
-                    copySuccess
-                      ? 'bg-emerald-500/10 text-emerald-400'
-                      : 'bg-zinc-900/50 hover:bg-zinc-800 text-white'
-                  }`}
+                  {/* Divisor vertical */}
+                  <div className="w-px bg-dark-border" />
+
+                  {/* Toggle Fotos Adicionais */}
+                  <button
+                    type="button"
+                    onClick={() => setAdditionalMode((v) => !v)}
+                    title={additionalMode ? 'Modo Adicional ATIVO — clique para desativar' : 'Ativar modo de Fotos Adicionais'}
+                    className={`flex items-center gap-2 px-4 py-3 text-xs font-semibold transition-all cursor-pointer ${
+                      additionalMode
+                        ? 'bg-gold-premium/15 text-gold-premium'
+                        : 'bg-zinc-900/50 hover:bg-zinc-800 text-text-muted hover:text-white'
+                    }`}
+                  >
+                    <Plus className={`w-4 h-4 transition-transform duration-200 ${additionalMode ? 'rotate-45 text-gold-premium' : ''}`} />
+                    <span className="hidden sm:inline whitespace-nowrap">
+                      {additionalMode ? 'Adicional ON' : 'Adicional'}
+                    </span>
+                  </button>
+                </div>
+
+                <a
+                  href={`/galeria/${sessionData.id}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-center justify-center gap-2 border border-dark-border bg-zinc-900/50 hover:bg-zinc-850 text-white px-5 py-3 rounded-lg font-medium text-sm transition-all text-center"
                 >
-                  <LinkIcon className="w-4 h-4 text-gold-premium" />
-                  <span>{copySuccess ? 'Link Copiado!' : 'Copiar Link da Cliente'}</span>
-                </button>
+                  <ExternalLink className="w-4.5 h-4.5 text-gold-premium" />
+                  <span>Visualizar Galeria</span>
+                </a>
 
-                {/* Divisor vertical */}
-                <div className="w-px bg-dark-border" />
-
-                {/* Toggle Fotos Adicionais */}
                 <button
-                  type="button"
-                  onClick={() => setAdditionalMode((v) => !v)}
-                  title={additionalMode ? 'Modo Adicional ATIVO — clique para desativar' : 'Ativar modo de Fotos Adicionais'}
-                  className={`flex items-center gap-2 px-4 py-3 text-xs font-semibold transition-all cursor-pointer ${
-                    additionalMode
-                      ? 'bg-gold-premium/15 text-gold-premium'
-                      : 'bg-zinc-900/50 hover:bg-zinc-800 text-text-muted hover:text-white'
-                  }`}
+                  onClick={handleDeleteSession}
+                  disabled={isDeleting}
+                  className="flex items-center justify-center gap-2 border border-dark-border bg-zinc-900/50 hover:bg-red-500/10 hover:border-red-500/30 hover:text-red-400 text-text-muted px-5 py-3 rounded-lg font-medium text-sm transition-all cursor-pointer"
                 >
-                  <Plus className={`w-4 h-4 transition-transform duration-200 ${additionalMode ? 'rotate-45 text-gold-premium' : ''}`} />
-                  <span className="hidden sm:inline whitespace-nowrap">
-                    {additionalMode ? 'Adicional ON' : 'Adicional'}
-                  </span>
+                  <Trash2 className="w-4.5 h-4.5" />
+                  <span>Excluir Sessão</span>
                 </button>
               </div>
 
               {/* Dica contextual quando toggle está ativo */}
               {additionalMode && (
-                <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-gold-premium/8 border border-gold-premium/20 text-gold-premium text-xs font-medium">
+                <div className="flex items-center gap-2 px-4 py-2.5 rounded-lg bg-gold-premium/8 border border-gold-premium/20 text-gold-premium text-xs font-medium max-w-xl">
                   <Plus className="w-3.5 h-3.5 shrink-0" />
                   <span>O link gerado abrirá a galeria em <strong>modo adicional</strong>: fotos já selecionadas aparecem em P&B.</span>
                 </div>
               )}
-
-              <a
-                href={`/galeria/${sessionData.id}`}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="flex items-center justify-center gap-2 border border-dark-border bg-zinc-900/50 hover:bg-zinc-850 text-white px-5 py-3 rounded-lg font-medium text-sm transition-all text-center"
-              >
-                <ExternalLink className="w-4.5 h-4.5 text-gold-premium" />
-                <span>Visualizar Galeria</span>
-              </a>
-
-              <button
-                onClick={handleDeleteSession}
-                disabled={isDeleting}
-                className="flex items-center justify-center gap-2 border border-dark-border bg-zinc-900/50 hover:bg-red-500/10 hover:border-red-500/30 hover:text-red-400 text-text-muted px-5 py-3 rounded-lg font-medium text-sm transition-all cursor-pointer"
-              >
-                <Trash2 className="w-4.5 h-4.5" />
-                <span>Excluir Sessão</span>
-              </button>
             </div>
 
           </div>

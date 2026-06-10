@@ -110,10 +110,10 @@ export default function ClientGallery({ session }: ClientGalleryProps) {
 
   const isAdditionalMode = session.isAdditionalMode === true;
 
-  // Calcular excedente de fotos
+  // Calcular excedente de fotos (desativado no modo adicional)
   const packageLimit = session.max_photos || 0;
-  const overLimit = packageLimit > 0 ? Math.max(0, selectedIds.size - packageLimit) : 0;
-  const isOverLimit = overLimit > 0;
+  const overLimit = !isAdditionalMode && packageLimit > 0 ? Math.max(0, selectedIds.size - packageLimit) : 0;
+  const isOverLimit = !isAdditionalMode && overLimit > 0;
 
   // Proteção contra Printscreen, Impressão e Cópia
   useEffect(() => {
@@ -433,9 +433,15 @@ export default function ClientGallery({ session }: ClientGalleryProps) {
           </p>
           <div className="bg-zinc-900/50 p-4 border border-dark-border rounded-lg text-left text-xs space-y-2">
             <p className="text-zinc-300 font-medium">Resumo:</p>
-            <p className="text-text-muted"><strong>Total de fotos:</strong> {selectedIds.size}</p>
-            {overLimit > 0 && (
-              <p className="text-text-muted"><strong>Adicionais:</strong> {overLimit}</p>
+            {isAdditionalMode ? (
+              <p className="text-text-muted"><strong>Fotos adicionais selecionadas:</strong> {selectedIds.size}</p>
+            ) : (
+              <>
+                <p className="text-text-muted"><strong>Total de fotos:</strong> {selectedIds.size}</p>
+                {overLimit > 0 && (
+                  <p className="text-text-muted"><strong>Adicionais:</strong> {overLimit}</p>
+                )}
+              </>
             )}
           </div>
         </div>
@@ -732,21 +738,32 @@ export default function ClientGallery({ session }: ClientGalleryProps) {
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col sm:flex-row items-center justify-between gap-3 py-3">
             <div className="text-center sm:text-left flex-1">
               <span className="block text-xs uppercase tracking-wider text-text-muted mb-0.5">
-                Selecionadas
+                {isAdditionalMode ? 'Fotos adicionais' : 'Selecionadas'}
               </span>
               <div className="flex items-center gap-2">
                 <span className="font-serif text-lg font-bold text-white">
-                  <span className={isOverLimit ? 'text-amber-400' : 'text-gold-premium'}>{selectedIds.size}</span>
-                  {packageLimit > 0 && <span className="text-text-muted font-normal"> / {packageLimit}</span>}
-                  <span className="text-sm font-normal text-text-muted ml-1">foto{selectedIds.size !== 1 ? 's' : ''}</span>
+                  {isAdditionalMode ? (
+                    <>
+                      <span className="text-gold-premium">{selectedIds.size}</span>
+                      <span className="text-sm font-normal text-text-muted ml-1">
+                        foto{selectedIds.size !== 1 ? 's' : ''} selecionada{selectedIds.size !== 1 ? 's' : ''}
+                      </span>
+                    </>
+                  ) : (
+                    <>
+                      <span className={isOverLimit ? 'text-amber-400' : 'text-gold-premium'}>{selectedIds.size}</span>
+                      {packageLimit > 0 && <span className="text-text-muted font-normal"> / {packageLimit}</span>}
+                      <span className="text-sm font-normal text-text-muted ml-1">foto{selectedIds.size !== 1 ? 's' : ''}</span>
+                    </>
+                  )}
                 </span>
-                {isOverLimit && (
+                {!isAdditionalMode && isOverLimit && (
                   <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-amber-500/15 border border-amber-500/30 text-amber-400 text-xs font-semibold">
                     +{overLimit} extra{overLimit !== 1 ? 's' : ''}
                   </span>
                 )}
               </div>
-              {isOverLimit && (
+              {!isAdditionalMode && isOverLimit && (
                 <p className="text-amber-400 text-[11px] font-medium mt-1 leading-snug max-w-xs">
                   Você atingiu a quantidade de fotos contratadas. A partir de agora, haverá um acréscimo de R$ 30 por foto adicional.
                 </p>
@@ -858,7 +875,7 @@ export default function ClientGallery({ session }: ClientGalleryProps) {
             <div className="text-center space-y-2">
               <h3 className="font-serif text-xl font-semibold text-white">Finalizar Seleção?</h3>
               <p className="text-text-muted text-sm font-light leading-relaxed">
-                Você selecionou <strong>{selectedIds.size}</strong> fotos. Após a confirmação, sua escolha será enviada e **não poderá ser modificada**.
+                Você selecionou <strong>{selectedIds.size}</strong> foto{selectedIds.size !== 1 ? 's' : ''}{isAdditionalMode ? ' adicionais' : ''}. Após a confirmação, sua escolha será enviada e **não poderá ser modificada**.
               </p>
             </div>
 
