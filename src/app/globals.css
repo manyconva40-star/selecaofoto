@@ -1,0 +1,56 @@
+@import "tailwindcss";
+
+:root {
+  --background: #0B0B0B;
+  --foreground: #F5F5F7;
+  --card-bg: #161618;
+  --border-color: #2C2C2E;
+  --gold-primary: #C5A880; /* Champagne Gold Premium */
+  --gold-hover: #B4966E;
+  --text-muted: #8E8E93;
+}
+
+@theme {
+  --font-sans: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
+  --font-serif: var(--font-playfair), ui-serif, Georgia, Cambria, serif;
+  
+  --color-dark-bg: var(--background);
+  --color-dark-card: var(--card-bg);
+  --color-dark-border: var(--border-color);
+  --color-gold-premium: var(--gold-primary);
+  --color-gold-premium-hover: var(--gold-hover);
+  --color-text-muted: var(--text-muted);
+}
+
+body {
+  background-color: var(--background);
+  color: var(--foreground);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Custom scrollbars for a premium dark feel */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: #0B0B0B;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #2C2C2E;
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #3A3A3C;
+}
+
+/* Gold text selection */
+::selection {
+  background-color: rgba(197, 168, 128, 0.2);
+  color: #C5A880;
+}
