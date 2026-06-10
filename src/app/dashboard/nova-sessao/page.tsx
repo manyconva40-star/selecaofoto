@@ -405,20 +405,27 @@ export default function NovaSessaoPage() {
                         </div>
                       </div>
                     ) : (
-                      <button
-                        type="button"
-                        onClick={() => coverInputRef.current?.click()}
-                        disabled={isSubmitting}
-                        className="w-full border border-dashed border-dark-border hover:border-gold-premium/50 rounded-lg p-5 flex flex-col items-center justify-center text-center cursor-pointer transition-all duration-300 bg-zinc-900/20 hover:bg-zinc-900/40"
+                      <div
+                        onClick={() => !isSubmitting && coverInputRef.current?.click()}
+                        onDragOver={(e) => e.preventDefault()}
+                        onDrop={(e) => {
+                          e.preventDefault();
+                          const file = e.dataTransfer.files[0];
+                          if (file && file.type.startsWith('image/')) {
+                            setCoverFile(file);
+                            setCoverPreview(URL.createObjectURL(file));
+                          }
+                        }}
+                        className={`w-full border border-dashed border-dark-border hover:border-gold-premium/50 rounded-lg p-5 flex flex-col items-center justify-center text-center transition-all duration-300 bg-zinc-900/20 hover:bg-zinc-900/40 ${isSubmitting ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
                       >
                         <Upload className="w-6 h-6 text-gold-premium/70 mb-2" />
                         <span className="text-white text-xs font-medium block">
-                          Selecionar foto de capa (Formato horizontal)
+                          Clique ou arraste a foto de capa
                         </span>
                         <span className="text-text-muted text-[10px] font-light mt-1">
-                          Imagem principal de boas vindas para imersão da cliente.
+                          Formato horizontal recomendado. Imagem de boas-vindas da galeria.
                         </span>
-                      </button>
+                      </div>
                     )}
                   </div>
                 </div>

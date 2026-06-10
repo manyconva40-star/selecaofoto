@@ -53,7 +53,7 @@ export async function POST(request: Request) {
           client_name,
           session_date: date,
           max_selections: parseInt(max_photos, 10),
-          password: password || null,
+          password: password && password.trim() !== '' ? password.trim() : null,
           drive_folder_id: folderId,
           photographer_id: photographerEmail,
           photographer_name: photographerName,
