@@ -415,17 +415,19 @@ export default function ClientGallery({ session }: ClientGalleryProps) {
         </div>
       )}
 
-      {/* Header Cliente */}
-      <header id="gallery-grid" className="border-b border-dark-border bg-dark-card/30 backdrop-blur-md sticky top-0 z-20">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-20 flex items-center justify-between">
-          <div>
-            <span className="font-serif text-lg text-white font-medium">{session.client_name}</span>
+      {/* Header Cliente (apenas se não houver imagem de capa para evitar redundância) */}
+      {!session.cover_image_url && (
+        <header className="border-b border-dark-border bg-dark-card/30 backdrop-blur-md sticky top-0 z-20">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-20 flex items-center justify-between">
+            <div>
+              <span className="font-serif text-lg text-white font-medium">{session.client_name}</span>
+            </div>
           </div>
-        </div>
-      </header>
+        </header>
+      )}
 
       {/* Galeria Grid */}
-      <main className="flex-grow max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-10 pb-48">
+      <main id="gallery-grid" className="flex-grow max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-10 pb-48">
         {error ? (
           <div className="max-w-md mx-auto text-center py-12 p-6 bg-red-500/10 border border-red-500/20 rounded-xl text-red-400">
             <AlertCircle className="w-10 h-10 mx-auto mb-3" />

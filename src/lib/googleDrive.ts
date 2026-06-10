@@ -59,7 +59,7 @@ export async function createSessionFolder(
 ): Promise<string> {
   try {
     const folderMetadata = {
-      name: `${clientName} - ${sessionName}`,
+      name: sessionName ? `${clientName} - ${sessionName}` : clientName,
       mimeType: 'application/vnd.google-apps.folder',
       parents: [parentFolderId],
     };

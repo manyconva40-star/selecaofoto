@@ -263,7 +263,7 @@ export default function NovaSessaoPage() {
             <CheckCircle2 className="w-16 h-16 text-emerald-500 mx-auto mb-6" />
             <h2 className="font-serif text-3xl font-semibold text-white tracking-tight mb-3">Sessão Criada!</h2>
             <p className="text-text-muted text-sm leading-relaxed font-light mb-8">
-              A sessão <strong>"{formData.name}"</strong> para <strong>{formData.client_name}</strong> foi configurada com sucesso.
+              A sessão para <strong>{formData.client_name}</strong> foi configurada com sucesso.
               As fotos estão salvas na pasta correspondente do seu Google Drive.
             </p>
             <div className="flex flex-col gap-3">
@@ -309,22 +309,6 @@ export default function NovaSessaoPage() {
                       required
                       placeholder="Ex: Maria Carolina"
                       value={formData.client_name}
-                      onChange={handleInputChange}
-                      disabled={isSubmitting}
-                      className="w-full bg-zinc-900 border border-dark-border rounded-lg px-4 py-3 text-sm focus:outline-none focus:border-gold-premium text-white transition-colors"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-xs font-semibold uppercase tracking-wider text-text-muted mb-2">
-                      Nome do Ensaio / Sessão
-                    </label>
-                    <input
-                      type="text"
-                      name="name"
-                      required
-                      placeholder="Ex: Ensaio Externo Gestante"
-                      value={formData.name}
                       onChange={handleInputChange}
                       disabled={isSubmitting}
                       className="w-full bg-zinc-900 border border-dark-border rounded-lg px-4 py-3 text-sm focus:outline-none focus:border-gold-premium text-white transition-colors"
