@@ -396,7 +396,7 @@ export default function ClientGallery({ session }: ClientGalleryProps) {
 
           {/* Conteúdo Textual Centralizado */}
           <div className="relative z-10 flex flex-col items-center text-center px-4 max-w-3xl mx-auto space-y-6">
-            <span className="font-sans text-[10px] sm:text-xs font-semibold tracking-[0.35em] text-zinc-350 uppercase animate-fade-in">
+            <span className="font-sans text-[8px] sm:text-[9px] font-medium tracking-[0.4em] text-zinc-400/70 uppercase animate-fade-in">
               {session.photographer_name || 'Fotógrafo'}
             </span>
             <h1 className="font-serif text-4xl sm:text-6xl md:text-7xl font-extralight text-white tracking-widest uppercase drop-shadow-xl leading-tight select-none">
