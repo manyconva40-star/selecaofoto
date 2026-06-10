@@ -40,6 +40,51 @@ export default function ClientGallery({ session }: ClientGalleryProps) {
   const [showCopyrightWarning, setShowCopyrightWarning] = useState(false);
   const [isSheetExpanded, setIsSheetExpanded] = useState(false);
 
+  // Swipe state for lightbox
+  const lbTouchStartX = useRef<number | null>(null);
+  const lbTouchDeltaX = useRef<number>(0);
+  const [lbDragOffset, setLbDragOffset] = useState(0);
+  const [lbIsAnimating, setLbIsAnimating] = useState(false);
+
+  const handleLbSwipeStart = (clientX: number) => {
+    if (lbIsAnimating) return;
+    lbTouchStartX.current = clientX;
+    lbTouchDeltaX.current = 0;
+  };
+
+  const handleLbSwipeMove = (clientX: number) => {
+    if (lbTouchStartX.current === null) return;
+    const delta = clientX - lbTouchStartX.current;
+    lbTouchDeltaX.current = delta;
+    setLbDragOffset(delta);
+  };
+
+  const handleLbSwipeEnd = () => {
+    if (lbTouchStartX.current === null) return;
+    const delta = lbTouchDeltaX.current;
+    lbTouchStartX.current = null;
+
+    if (Math.abs(delta) > 60) {
+      const dir = delta < 0 ? 1 : -1; // neg = swipe left = next; pos = swipe right = prev
+      setLbIsAnimating(true);
+      setLbDragOffset(dir * -window.innerWidth);
+      setTimeout(() => {
+        setActivePhotoIndex((prev) => {
+          if (prev === null) return prev;
+          const next = prev - dir;
+          if (next < 0 || next >= photos.length) return prev;
+          return next;
+        });
+        setLbDragOffset(0);
+        setLbIsAnimating(false);
+      }, 280);
+    } else {
+      // Snap back
+      setLbDragOffset(0);
+    }
+    lbTouchDeltaX.current = 0;
+  };
+
   // Drag state for bottom sheet
   const sheetDragStart = useRef<number | null>(null);
   const sheetDragDelta = useRef<number>(0);
@@ -755,19 +800,43 @@ export default function ClientGallery({ session }: ClientGalleryProps) {
             </button>
           </div>
 
-          {/* Área Central da Imagem */}
-          <div className="flex-grow flex items-center justify-between px-2 sm:px-6 relative">
-            {/* Botão Anterior */}
+          {/* Área Central da Imagem — swipe para navegar */}
+          <div
+            className="flex-grow flex items-center justify-center relative overflow-hidden"
+            onTouchStart={(e) => handleLbSwipeStart(e.touches[0].clientX)}
+            onTouchMove={(e) => handleLbSwipeMove(e.touches[0].clientX)}
+            onTouchEnd={handleLbSwipeEnd}
+            onPointerDown={(e) => {
+              // only non-touch (mouse) on desktop
+              if (e.pointerType !== 'mouse') return;
+              handleLbSwipeStart(e.clientX);
+            }}
+            onPointerMove={(e) => {
+              if (e.pointerType !== 'mouse') return;
+              handleLbSwipeMove(e.clientX);
+            }}
+            onPointerUp={(e) => {
+              if (e.pointerType !== 'mouse') return;
+              handleLbSwipeEnd();
+            }}
+          >
+            {/* Botões de seta — visíveis apenas em desktop */}
             <button
               onClick={() => setActivePhotoIndex((prev) => (prev !== null && prev > 0 ? prev - 1 : prev))}
               disabled={activePhotoIndex === 0}
-              className="p-3 rounded-full bg-black/45 text-white hover:bg-zinc-800 disabled:opacity-20 disabled:cursor-not-allowed transition-all active:scale-90 cursor-pointer z-10"
+              className="hidden sm:flex absolute left-3 z-10 p-3 rounded-full bg-black/45 text-white hover:bg-zinc-800 disabled:opacity-20 disabled:cursor-not-allowed transition-all active:scale-90 cursor-pointer"
             >
               <ChevronLeft className="w-7 h-7" />
             </button>
 
-            {/* Imagem com proteção anti-print */}
-            <div className="w-full h-[70vh] flex items-center justify-center relative select-none">
+            {/* Imagem com swipe */}
+            <div
+              className="w-full h-[70vh] flex items-center justify-center relative select-none"
+              style={{
+                transform: `translateX(${lbDragOffset}px)`,
+                transition: lbIsAnimating || lbTouchStartX.current === null ? 'transform 0.28s cubic-bezier(0.25,0.46,0.45,0.94)' : 'none',
+              }}
+            >
               <img
                 src={photos[activePhotoIndex].thumbnail_url}
                 alt={photos[activePhotoIndex].filename}
@@ -780,14 +849,21 @@ export default function ClientGallery({ session }: ClientGalleryProps) {
               <div className="absolute inset-0" style={{ background: 'transparent', pointerEvents: 'none' }} />
             </div>
 
-            {/* Botão Próximo */}
             <button
               onClick={() => setActivePhotoIndex((prev) => (prev !== null && prev < photos.length - 1 ? prev + 1 : prev))}
               disabled={activePhotoIndex === photos.length - 1}
-              className="p-3 rounded-full bg-black/45 text-white hover:bg-zinc-800 disabled:opacity-20 disabled:cursor-not-allowed transition-all active:scale-90 cursor-pointer z-10"
+              className="hidden sm:flex absolute right-3 z-10 p-3 rounded-full bg-black/45 text-white hover:bg-zinc-800 disabled:opacity-20 disabled:cursor-not-allowed transition-all active:scale-90 cursor-pointer"
             >
               <ChevronRight className="w-7 h-7" />
             </button>
+
+            {/* Indicador de swipe no mobile (dica visual nos primeiros usos) */}
+            {activePhotoIndex === 0 && photos.length > 1 && (
+              <div className="absolute bottom-3 right-4 flex items-center gap-1 text-zinc-500 text-[10px] tracking-widest uppercase sm:hidden pointer-events-none">
+                <span>deslize</span>
+                <ChevronRight className="w-3 h-3" />
+              </div>
+            )}
           </div>
 
           {/* Footer Lightbox */}
