@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { 
   Lock, Heart, X, ChevronLeft, 
   ChevronRight, CheckCircle2, AlertCircle, Loader2, ShieldAlert
@@ -38,6 +38,49 @@ export default function ClientGallery({ session }: ClientGalleryProps) {
   const [isSuccess, setIsSuccess] = useState(session.status === 'closed');
   const [showConfirmModal, setShowConfirmModal] = useState(false);
   const [showCopyrightWarning, setShowCopyrightWarning] = useState(false);
+  const [isSheetExpanded, setIsSheetExpanded] = useState(false);
+
+  // Drag state for bottom sheet
+  const sheetDragStart = useRef<number | null>(null);
+  const sheetDragDelta = useRef<number>(0);
+
+  const handleSheetPointerDown = (e: React.PointerEvent) => {
+    sheetDragStart.current = e.clientY;
+    sheetDragDelta.current = 0;
+  };
+
+  const handleSheetPointerMove = (e: React.PointerEvent) => {
+    if (sheetDragStart.current === null) return;
+    sheetDragDelta.current = e.clientY - sheetDragStart.current;
+  };
+
+  const handleSheetPointerUp = () => {
+    if (sheetDragStart.current === null) return;
+    const delta = sheetDragDelta.current;
+    if (delta < -30) setIsSheetExpanded(true);   // swipe up
+    if (delta > 30) setIsSheetExpanded(false);   // swipe down
+    sheetDragStart.current = null;
+    sheetDragDelta.current = 0;
+  };
+
+  const handleSheetTouchStart = (e: React.TouchEvent) => {
+    sheetDragStart.current = e.touches[0].clientY;
+    sheetDragDelta.current = 0;
+  };
+
+  const handleSheetTouchMove = (e: React.TouchEvent) => {
+    if (sheetDragStart.current === null) return;
+    sheetDragDelta.current = e.touches[0].clientY - sheetDragStart.current;
+  };
+
+  const handleSheetTouchEnd = () => {
+    if (sheetDragStart.current === null) return;
+    const delta = sheetDragDelta.current;
+    if (delta < -30) setIsSheetExpanded(true);
+    if (delta > 30) setIsSheetExpanded(false);
+    sheetDragStart.current = null;
+    sheetDragDelta.current = 0;
+  };
 
   const isAdditionalMode = session.isAdditionalMode === true;
 
@@ -540,51 +583,119 @@ export default function ClientGallery({ session }: ClientGalleryProps) {
         )}
       </main>
 
-      {/* Barra de Progresso Inferior Fixa */}
+      {/* Bottom Sheet - Barra de Progresso Expansível */}
       {photos.length > 0 && (
-        <div className="fixed bottom-0 left-0 right-0 bg-dark-card/95 backdrop-blur-md border-t border-dark-border z-25">
+        <div
+          className="fixed left-0 right-0 bg-dark-card/97 backdrop-blur-xl border-t border-dark-border z-25 transition-all duration-400 ease-out"
+          style={{
+            bottom: 0,
+            height: isSheetExpanded ? '80vh' : 'auto',
+          }}
+        >
+          {/* Handle de Arrastar — sempre visível */}
+          <div
+            className="flex flex-col items-center pt-2 pb-1 cursor-grab active:cursor-grabbing select-none touch-none"
+            onPointerDown={handleSheetPointerDown}
+            onPointerMove={handleSheetPointerMove}
+            onPointerUp={handleSheetPointerUp}
+            onPointerLeave={handleSheetPointerUp}
+            onTouchStart={handleSheetTouchStart}
+            onTouchMove={handleSheetTouchMove}
+            onTouchEnd={handleSheetTouchEnd}
+            onClick={() => {
+              if (Math.abs(sheetDragDelta.current) < 5) setIsSheetExpanded((v) => !v);
+            }}
+          >
+            <div className="w-10 h-1 rounded-full bg-zinc-600 mb-1" />
+            {selectedIds.size > 0 && (
+              <span className="text-[10px] text-zinc-500 tracking-widest uppercase">
+                {isSheetExpanded ? 'Deslize para recolher' : 'Deslize para expandir'}
+              </span>
+            )}
+          </div>
 
-          {/* Faixa de Miniaturas das Fotos Selecionadas */}
+          {/* Área de Miniaturas */}
           {selectedIds.size > 0 && (
-            <div className="border-b border-dark-border/50">
-              <div
-                className="flex gap-2 px-4 py-2.5 overflow-x-auto no-scrollbar"
-                style={{ WebkitOverflowScrolling: 'touch' }}
-              >
-                {photos
-                  .filter((p) => selectedIds.has(p.id))
-                  .map((photo) => (
-                    <div
-                      key={photo.id}
-                      className="relative shrink-0 w-14 h-14 rounded-lg overflow-hidden border-2 border-gold-premium group cursor-pointer transition-transform duration-200 hover:scale-105 active:scale-95"
-                      onClick={() => setActivePhotoIndex(photos.indexOf(photo))}
-                    >
-                      <img
-                        src={photo.thumbnail_url}
-                        alt={photo.filename}
-                        draggable={false}
-                        onContextMenu={(e) => e.preventDefault()}
-                        className="w-full h-full object-cover pointer-events-none"
-                      />
-                      {/* Botão de remover ao hover */}
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          toggleSelectPhoto(photo.id);
-                        }}
-                        className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center cursor-pointer"
-                        title="Remover seleção"
+            <div
+              className="overflow-y-auto no-scrollbar"
+              style={{ maxHeight: isSheetExpanded ? 'calc(80vh - 130px)' : undefined }}
+            >
+              {isSheetExpanded ? (
+                /* Grade expandida: fotos maiores em grid */
+                <div className="px-4 pb-2">
+                  <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 gap-2">
+                    {photos
+                      .filter((p) => selectedIds.has(p.id))
+                      .map((photo) => (
+                        <div
+                          key={photo.id}
+                          className="relative rounded-xl overflow-hidden border-2 border-gold-premium group cursor-pointer transition-transform duration-200 hover:scale-105 active:scale-95 aspect-square"
+                          onClick={() => {
+                            setActivePhotoIndex(photos.indexOf(photo));
+                            setIsSheetExpanded(false);
+                          }}
+                        >
+                          <img
+                            src={photo.thumbnail_url}
+                            alt={photo.filename}
+                            draggable={false}
+                            onContextMenu={(e) => e.preventDefault()}
+                            className="w-full h-full object-cover pointer-events-none"
+                          />
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              toggleSelectPhoto(photo.id);
+                            }}
+                            className="absolute top-1 right-1 bg-black/70 hover:bg-red-600 rounded-full p-1 opacity-0 group-hover:opacity-100 transition-all cursor-pointer"
+                            title="Remover seleção"
+                          >
+                            <X className="w-3 h-3 text-white" />
+                          </button>
+                        </div>
+                      ))}
+                  </div>
+                </div>
+              ) : (
+                /* Tira horizontal: miniaturas pequenas */
+                <div
+                  className="flex gap-2 px-4 py-2 overflow-x-auto no-scrollbar border-b border-dark-border/50"
+                  style={{ WebkitOverflowScrolling: 'touch' }}
+                >
+                  {photos
+                    .filter((p) => selectedIds.has(p.id))
+                    .map((photo) => (
+                      <div
+                        key={photo.id}
+                        className="relative shrink-0 w-14 h-14 rounded-lg overflow-hidden border-2 border-gold-premium group cursor-pointer transition-transform duration-200 hover:scale-105 active:scale-95"
+                        onClick={() => setActivePhotoIndex(photos.indexOf(photo))}
                       >
-                        <X className="w-4 h-4 text-white" />
-                      </button>
-                    </div>
-                  ))}
-              </div>
+                        <img
+                          src={photo.thumbnail_url}
+                          alt={photo.filename}
+                          draggable={false}
+                          onContextMenu={(e) => e.preventDefault()}
+                          className="w-full h-full object-cover pointer-events-none"
+                        />
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            toggleSelectPhoto(photo.id);
+                          }}
+                          className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center cursor-pointer"
+                          title="Remover seleção"
+                        >
+                          <X className="w-4 h-4 text-white" />
+                        </button>
+                      </div>
+                    ))}
+                </div>
+              )}
             </div>
           )}
 
           {/* Contador e Botão Finalizar */}
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col sm:flex-row items-center justify-between gap-3 py-4">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col sm:flex-row items-center justify-between gap-3 py-3">
             <div className="text-center sm:text-left flex-1">
               <span className="block text-xs uppercase tracking-wider text-text-muted mb-0.5">
                 Selecionadas
