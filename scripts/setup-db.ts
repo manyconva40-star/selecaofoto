@@ -1,7 +1,12 @@
 import { createClient } from '@supabase/supabase-js'
 
-const supabaseUrl = 'https://aulerhoqdfojonvwnduo.supabase.co'
-const serviceRoleKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImF1bGVyaG9xZGZvam9udnduZHVvIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc4MTA5NjM0OCwiZXhwIjoyMDk2NjcyMzQ4fQ.3muUY-7oXW_1c9-SkB4L7BGvqOSeIvb7QWVGh6m0Blc'
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
+const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY!
+
+if (!supabaseUrl || !serviceRoleKey) {
+  console.error('❌ Defina NEXT_PUBLIC_SUPABASE_URL e SUPABASE_SERVICE_ROLE_KEY no .env.local')
+  process.exit(1)
+}
 
 const supabase = createClient(supabaseUrl, serviceRoleKey)
 
