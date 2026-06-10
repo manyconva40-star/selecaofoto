@@ -12,7 +12,7 @@ export async function POST(
   try {
     const { id } = await params;
 
-    const { selectedPhotoIds } = await request.json();
+    const { selectedPhotoIds, reviewToken } = await request.json();
 
     if (!Array.isArray(selectedPhotoIds)) {
       return NextResponse.json(
@@ -35,7 +35,14 @@ export async function POST(
       );
     }
 
-    if (dbSession.status === 'closed') {
+    // Verificar se é uma reabertura via review token
+    const isReview =
+      reviewToken !== undefined &&
+      reviewToken !== '' &&
+      dbSession.review_token !== null &&
+      reviewToken === dbSession.review_token;
+
+    if (dbSession.status === 'closed' && !isReview) {
       return NextResponse.json(
         { error: 'Esta seleção já foi finalizada anteriormente.' },
         { status: 400 }
@@ -77,10 +84,10 @@ export async function POST(
       }
     }
 
-    // 4. Atualizar o status da sessão para "closed"
+    // 4. Atualizar o status da sessão para "closed" e invalidar review_token
     const { error: updateSessionError } = await supabaseAdmin
       .from('sessions')
-      .update({ status: 'closed' })
+      .update({ status: 'closed', review_token: null })
       .eq('id', id);
 
     if (updateSessionError) {

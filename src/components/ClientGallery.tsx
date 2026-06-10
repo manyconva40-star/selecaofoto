@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { 
-  Camera, Lock, Eye, Heart, X, ChevronLeft, 
+  Lock, Heart, X, ChevronLeft, 
   ChevronRight, CheckCircle2, AlertCircle, Loader2 
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
@@ -16,6 +16,7 @@ interface ClientGalleryProps {
     hasPassword: boolean;
     status: string;
     photographer_id: string;
+    reviewToken?: string;
   };
 }
 
@@ -46,8 +47,14 @@ export default function ClientGallery({ session }: ClientGalleryProps) {
       }
 
       const data = await response.json();
-      setPhotos(data);
-      // Não há coluna 'selected' no schema — seleções ficam na tabela selections
+      if (data && typeof data === 'object' && !Array.isArray(data)) {
+        setPhotos(data.photos || []);
+        if (data.selectedPhotoIds) {
+          setSelectedIds(new Set(data.selectedPhotoIds));
+        }
+      } else {
+        setPhotos(Array.isArray(data) ? data : []);
+      }
     } catch (err: any) {
       console.error(err);
       setError(err.message || 'Erro ao carregar fotos da galeria.');
@@ -117,6 +124,7 @@ export default function ClientGallery({ session }: ClientGalleryProps) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           selectedPhotoIds: Array.from(selectedIds),
+          reviewToken: session.reviewToken,
         }),
       });
 
@@ -192,18 +200,13 @@ export default function ClientGallery({ session }: ClientGalleryProps) {
     return (
       <div className="flex-1 flex flex-col items-center justify-center bg-dark-bg min-h-screen px-4">
         <div className="w-full max-w-sm p-8 bg-dark-card border border-dark-border rounded-2xl shadow-xl space-y-6">
-          <div className="flex items-center gap-2 text-gold-premium justify-center">
-            <Camera className="w-6 h-6" />
-            <span className="font-serif text-lg font-bold tracking-widest uppercase">FotoSeleção</span>
-          </div>
-
           <div className="text-center">
             <div className="w-12 h-12 bg-zinc-900 border border-dark-border rounded-full flex items-center justify-center mx-auto mb-3">
               <Lock className="w-5 h-5 text-gold-premium" />
             </div>
             <h2 className="font-serif text-2xl font-semibold text-white tracking-tight">Galeria Protegida</h2>
             <p className="text-text-muted text-xs font-light mt-1.5 leading-relaxed">
-              Insira a senha fornecida pelo fotógrafo para acessar as fotos do ensaio de **{session.client_name}**.
+              Insira a senha fornecida pelo fotógrafo para acessar as fotos do ensaio de {session.client_name}.
             </p>
           </div>
 
@@ -250,19 +253,21 @@ export default function ClientGallery({ session }: ClientGalleryProps) {
     );
   }
 
+  // Calcular excedente de fotos
+  const packageLimit = session.max_photos || 0;
+  const overLimit = packageLimit > 0 ? Math.max(0, selectedIds.size - packageLimit) : 0;
+  const isOverLimit = overLimit > 0;
+
   return (
-    <div className="min-h-screen bg-dark-bg text-foreground flex flex-col font-sans">
+    <div
+      className="min-h-screen bg-dark-bg text-foreground flex flex-col font-sans"
+      style={{ userSelect: 'none', WebkitUserSelect: 'none' }}
+    >
       {/* Header Cliente */}
       <header className="border-b border-dark-border bg-dark-card/30 backdrop-blur-md sticky top-0 z-20">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-20 flex items-center justify-between">
           <div>
-            <span className="text-xs text-text-muted block font-light">Fotógrafo: {session.photographer_id}</span>
             <span className="font-serif text-lg text-white font-medium">{session.client_name}</span>
-          </div>
-
-          <div className="text-right">
-            <span className="text-xs text-text-muted block font-light">Cliente</span>
-            <span className="font-medium text-sm text-gold-premium">{session.client_name}</span>
           </div>
         </div>
       </header>
@@ -310,14 +315,19 @@ export default function ClientGallery({ session }: ClientGalleryProps) {
                         : 'border-dark-border/70 hover:border-zinc-650'
                     }`}
                   >
-                    {/* Imagem do grid */}
-                    <img
-                      src={photo.thumbnail_url}
-                      alt={photo.filename}
-                      loading="lazy"
-                      onClick={() => setActivePhotoIndex(index)}
-                      className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-103"
-                    />
+                    {/* Imagem do grid com proteção anti-print */}
+                    <div className="relative w-full h-full" onClick={() => setActivePhotoIndex(index)}>
+                      <img
+                        src={photo.thumbnail_url}
+                        alt={photo.filename}
+                        loading="lazy"
+                        draggable={false}
+                        onContextMenu={(e) => e.preventDefault()}
+                        className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-103 pointer-events-none"
+                      />
+                      {/* Overlay anti-screenshot transparente */}
+                      <div className="absolute inset-0" style={{ background: 'transparent' }} />
+                    </div>
 
                     {/* Botão de coração de seleção */}
                     <button
@@ -352,11 +362,25 @@ export default function ClientGallery({ session }: ClientGalleryProps) {
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col sm:flex-row items-center justify-between gap-4">
             <div className="text-center sm:text-left flex-1">
               <span className="block text-xs uppercase tracking-wider text-text-muted mb-0.5">
-                Fotos Escolhidas
+                Selecionadas
               </span>
-              <span className="font-serif text-lg font-bold text-white">
-                <span className="text-gold-premium">{selectedIds.size}</span> foto{selectedIds.size !== 1 ? 's' : ''}
-              </span>
+              <div className="flex items-center gap-2">
+                <span className="font-serif text-lg font-bold text-white">
+                  <span className={isOverLimit ? 'text-amber-400' : 'text-gold-premium'}>{selectedIds.size}</span>
+                  {packageLimit > 0 && <span className="text-text-muted font-normal"> / {packageLimit}</span>}
+                  <span className="text-sm font-normal text-text-muted ml-1">foto{selectedIds.size !== 1 ? 's' : ''}</span>
+                </span>
+                {isOverLimit && (
+                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-amber-500/15 border border-amber-500/30 text-amber-400 text-xs font-semibold">
+                    +{overLimit} extra{overLimit !== 1 ? 's' : ''}
+                  </span>
+                )}
+              </div>
+              {isOverLimit && (
+                <p className="text-amber-400 text-[11px] font-medium mt-1 leading-snug max-w-xs">
+                  Você atingiu a quantidade de fotos contratadas. A partir de agora, haverá um acréscimo de R$ 30 por foto adicional.
+                </p>
+              )}
             </div>
 
             <button
@@ -405,13 +429,18 @@ export default function ClientGallery({ session }: ClientGalleryProps) {
               <ChevronLeft className="w-7 h-7" />
             </button>
 
-            {/* Imagem */}
-            <div className="w-full h-[70vh] flex items-center justify-center relative">
+            {/* Imagem com proteção anti-print */}
+            <div className="w-full h-[70vh] flex items-center justify-center relative select-none">
               <img
                 src={photos[activePhotoIndex].thumbnail_url}
                 alt={photos[activePhotoIndex].filename}
-                className="max-w-full max-h-full object-contain"
+                draggable={false}
+                onContextMenu={(e) => e.preventDefault()}
+                className="max-w-full max-h-full object-contain pointer-events-none"
+                style={{ userSelect: 'none', WebkitUserSelect: 'none' }}
               />
+              {/* Overlay anti-screenshot no lightbox */}
+              <div className="absolute inset-0" style={{ background: 'transparent', pointerEvents: 'none' }} />
             </div>
 
             {/* Botão Próximo */}

@@ -26,9 +26,21 @@ export default function SessionDetails({ sessionData, photosData }: SessionDetai
 
   const handleCopyLink = async () => {
     const origin = window.location.origin;
-    const clientLink = `${origin}/galeria/${sessionData.id}`;
     
     try {
+      let clientLink = `${origin}/galeria/${sessionData.id}`;
+
+      // Se a sessão está fechada, gerar um review token para reabrir
+      if (isCompleted) {
+        const res = await fetch(`/api/sessions/${sessionData.id}/review-token`, {
+          method: 'POST',
+        });
+        if (res.ok) {
+          const { token } = await res.json();
+          clientLink = `${origin}/galeria/${sessionData.id}?token=${token}`;
+        }
+      }
+
       await navigator.clipboard.writeText(clientLink);
       setCopySuccess(true);
       setTimeout(() => setCopySuccess(false), 2000);
@@ -192,13 +204,6 @@ export default function SessionDetails({ sessionData, photosData }: SessionDetai
                 >
                   <Download className="w-4.5 h-4.5" />
                   <span>Exportar .TXT (Lightroom Classic)</span>
-                </a>
-                <a
-                  href={`/api/sessions/${sessionData.id}/export?format=csv`}
-                  className="flex items-center justify-center gap-2 border border-dark-border bg-dark-card hover:bg-zinc-800 text-white font-medium px-5 py-3.5 rounded-lg text-sm transition-all"
-                >
-                  <Download className="w-4.5 h-4.5 text-gold-premium" />
-                  <span>Exportar .CSV</span>
                 </a>
               </div>
             ) : (

@@ -302,7 +302,7 @@ export default function NovaSessaoPage() {
 
                     <div>
                       <label className="block text-xs font-semibold uppercase tracking-wider text-text-muted mb-2">
-                        Limite de Fotos
+                        Fotos do Pacote Contratado
                       </label>
                       <input
                         type="number"
@@ -314,6 +314,9 @@ export default function NovaSessaoPage() {
                         disabled={isSubmitting}
                         className="w-full bg-zinc-900 border border-dark-border rounded-lg px-4 py-3 text-sm focus:outline-none focus:border-gold-premium text-white transition-colors"
                       />
+                      <p className="text-text-muted text-[10px] mt-1.5 font-light leading-snug">
+                        Quantidade inclusa no pacote. Fotos extras têm acréscimo.
+                      </p>
                     </div>
                   </div>
 

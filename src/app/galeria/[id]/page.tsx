@@ -7,15 +7,17 @@ export const revalidate = 0; // Evita cache
 
 interface PageProps {
   params: Promise<{ id: string }>;
+  searchParams: Promise<{ token?: string }>;
 }
 
-export default async function ClientGalleryPage({ params }: PageProps) {
+export default async function ClientGalleryPage({ params, searchParams }: PageProps) {
   const { id } = await params;
+  const { token } = await searchParams;
 
   // 1. Buscar metadados essenciais da sessão no Supabase (sem carregar a senha real no HTML inicial)
   const { data: dbSession, error } = await supabaseAdmin
     .from('sessions')
-    .select('id, client_name, session_date, max_selections, status, photographer_id, password')
+    .select('id, client_name, session_date, max_selections, status, photographer_id, password, review_token')
     .eq('id', id)
     .single();
 
@@ -39,6 +41,13 @@ export default async function ClientGalleryPage({ params }: PageProps) {
     );
   }
 
+  // Verificar se o token de revisão é válido (permite reabrir sessão fechada)
+  const isReopened =
+    token !== undefined &&
+    token !== '' &&
+    dbSession.review_token !== null &&
+    token === dbSession.review_token;
+
   // Sanitizar o objeto da sessão para a galeria pública, informando apenas se possui senha
   const sanitizedSession = {
     id: dbSession.id,
@@ -46,8 +55,9 @@ export default async function ClientGalleryPage({ params }: PageProps) {
     date: dbSession.session_date,
     max_photos: dbSession.max_selections,
     hasPassword: dbSession.password !== null && dbSession.password !== '',
-    status: dbSession.status,
+    status: isReopened ? 'active' : dbSession.status,
     photographer_id: dbSession.photographer_id,
+    reviewToken: isReopened ? token : undefined,
   };
 
   return <ClientGallery session={sanitizedSession} />;

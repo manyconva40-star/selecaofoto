@@ -55,7 +55,18 @@ export async function GET(
       thumbnail_url: `/api/photos/proxy/${photo.drive_file_id}`,
     }));
 
-    return NextResponse.json(photosWithProxyUrl);
+    // 4. Buscar seleções existentes para carregar progresso
+    const { data: selections } = await supabaseAdmin
+      .from('selections')
+      .select('photo_id')
+      .eq('session_id', id);
+
+    const selectedPhotoIds = selections ? selections.map((s: any) => s.photo_id) : [];
+
+    return NextResponse.json({
+      photos: photosWithProxyUrl,
+      selectedPhotoIds,
+    });
   } catch (error: any) {
     console.error('Erro no endpoint /api/sessions/[id]/photos:', error);
     return NextResponse.json(
