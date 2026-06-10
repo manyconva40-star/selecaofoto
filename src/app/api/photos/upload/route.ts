@@ -23,6 +23,7 @@ export async function POST(request: Request) {
     const file = formData.get('file') as File;
     const sessionId = formData.get('sessionId') as string;
     const isCover = formData.get('isCover') === 'true';
+    const coverPositionY = formData.get('coverPositionY') as string;
 
     if (!file || !sessionId) {
       return NextResponse.json(
@@ -71,9 +72,12 @@ export async function POST(request: Request) {
 
     // Se for foto de capa, atualiza a sessão e encerra
     if (isCover) {
+      const separator = uploadResult.url.includes('?') ? '&' : '?';
+      const finalUrl = coverPositionY ? `${uploadResult.url}${separator}pos=${coverPositionY}` : uploadResult.url;
+
       const { error: updateError } = await supabaseAdmin
         .from('sessions')
-        .update({ cover_image_url: uploadResult.url })
+        .update({ cover_image_url: finalUrl })
         .eq('id', sessionId);
 
       if (updateError) {
@@ -84,7 +88,7 @@ export async function POST(request: Request) {
         );
       }
 
-      return NextResponse.json({ cover_image_url: uploadResult.url });
+      return NextResponse.json({ cover_image_url: finalUrl });
     }
 
     // 7. Inserir metadados da foto no Supabase

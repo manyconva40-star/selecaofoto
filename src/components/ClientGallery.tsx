@@ -3,7 +3,8 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { 
   Lock, Heart, X, ChevronLeft, 
-  ChevronRight, CheckCircle2, AlertCircle, Loader2, ShieldAlert
+  ChevronRight, CheckCircle2, AlertCircle, Loader2, ShieldAlert,
+  ChevronUp, ChevronDown
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
 
@@ -41,6 +42,29 @@ export default function ClientGallery({ session }: ClientGalleryProps) {
   const [isSheetExpanded, setIsSheetExpanded] = useState(false);
   // Track whether lightbox was opened from thumbnail strip (to restore expanded state on close)
   const [lbOpenedFromSheet, setLbOpenedFromSheet] = useState(false);
+
+  const lightboxPhotos = lbOpenedFromSheet
+    ? photos.filter((p) => selectedIds.has(p.id))
+    : photos;
+
+  const getCoverPosition = () => {
+    if (!session.cover_image_url) return 'center';
+    const match = session.cover_image_url.match(/[&?]pos=(\d+)/);
+    return match ? `center ${match[1]}%` : 'center';
+  };
+
+  // Ajustar o índice ativo caso uma foto selecionada seja removida da visualização no lightbox
+  useEffect(() => {
+    if (activePhotoIndex !== null && lbOpenedFromSheet) {
+      const selectedCount = photos.filter((p) => selectedIds.has(p.id)).length;
+      if (selectedCount === 0) {
+        setActivePhotoIndex(null);
+        setLbOpenedFromSheet(false);
+      } else if (activePhotoIndex >= selectedCount) {
+        setActivePhotoIndex(selectedCount - 1);
+      }
+    }
+  }, [selectedIds, activePhotoIndex, lbOpenedFromSheet, photos]);
 
   // Drag state for bottom sheet
   const sheetDragStart = useRef<number | null>(null);
@@ -322,13 +346,13 @@ export default function ClientGallery({ session }: ClientGalleryProps) {
     if (activePhotoIndex === null) return;
     
     if (e.key === 'ArrowRight') {
-      setActivePhotoIndex((prev) => (prev !== null && prev < photos.length - 1 ? prev + 1 : prev));
+      setActivePhotoIndex((prev) => (prev !== null && prev < lightboxPhotos.length - 1 ? prev + 1 : prev));
     } else if (e.key === 'ArrowLeft') {
       setActivePhotoIndex((prev) => (prev !== null && prev > 0 ? prev - 1 : prev));
     } else if (e.key === 'Escape') {
       setActivePhotoIndex(null);
     }
-  }, [activePhotoIndex, photos.length]);
+  }, [activePhotoIndex, lightboxPhotos.length]);
 
   useEffect(() => {
     window.addEventListener('keydown', handleKeyDown);
@@ -435,6 +459,7 @@ export default function ClientGallery({ session }: ClientGalleryProps) {
               src={session.cover_image_url}
               alt="Capa da Galeria"
               className="w-full h-full object-cover pointer-events-none select-none"
+              style={{ objectPosition: getCoverPosition() }}
             />
             {/* Gradiente escuro para contraste e legibilidade */}
             <div className="absolute inset-0 bg-black/45 backdrop-brightness-[0.9] bg-gradient-to-b from-black/30 via-black/25 to-dark-bg" />
@@ -442,9 +467,6 @@ export default function ClientGallery({ session }: ClientGalleryProps) {
 
           {/* Conteúdo Textual Centralizado */}
           <div className="relative z-10 flex flex-col items-center text-center px-4 max-w-3xl mx-auto space-y-6">
-            <span className="font-sans text-[8px] sm:text-[9px] font-medium tracking-[0.4em] text-zinc-400/70 uppercase animate-fade-in">
-              {session.photographer_name || 'Fotógrafo'}
-            </span>
             <h1 className="font-serif text-4xl sm:text-6xl md:text-7xl font-extralight text-white tracking-widest uppercase drop-shadow-xl leading-tight select-none">
               {session.client_name}
             </h1>
@@ -604,24 +626,19 @@ export default function ClientGallery({ session }: ClientGalleryProps) {
             transition: 'height 0.45s cubic-bezier(0.32, 0.72, 0, 1)',
           }}
         >
-          {/* Handle de Arrastar — sempre visível */}
+          {/* Handle de Expandir/Recolher — clique para alternar */}
           <div
-            className="flex flex-col items-center pt-2 pb-1 cursor-grab active:cursor-grabbing select-none touch-none"
-            onPointerDown={handleSheetPointerDown}
-            onPointerMove={handleSheetPointerMove}
-            onPointerUp={handleSheetPointerUp}
-            onPointerLeave={handleSheetPointerUp}
-            onTouchStart={handleSheetTouchStart}
-            onTouchMove={handleSheetTouchMove}
-            onTouchEnd={handleSheetTouchEnd}
-            onClick={() => {
-              if (Math.abs(sheetDragDelta.current) < 5) setIsSheetExpanded((v) => !v);
-            }}
+            className="flex flex-col items-center pt-2 pb-1.5 cursor-pointer select-none"
+            onClick={() => setIsSheetExpanded((v) => !v)}
           >
-            <div className="w-10 h-1 rounded-full bg-zinc-600 mb-1" />
+            {isSheetExpanded ? (
+              <ChevronDown className="w-4.5 h-4.5 text-gold-premium/80 mb-0.5" />
+            ) : (
+              <ChevronUp className="w-4.5 h-4.5 text-gold-premium/80 mb-0.5 animate-bounce" style={{ animationDuration: '3s' }} />
+            )}
             {selectedIds.size > 0 && (
-              <span className="text-[10px] text-zinc-500 tracking-widest uppercase">
-                {isSheetExpanded ? 'Deslize para recolher' : 'Confira sua seleção'}
+              <span className="text-[9px] text-zinc-500 tracking-widest uppercase font-medium">
+                {isSheetExpanded ? 'Clique para recolher' : 'Clique para conferir sua seleção'}
               </span>
             )}
           </div>
@@ -644,7 +661,8 @@ export default function ClientGallery({ session }: ClientGalleryProps) {
                           className="relative rounded-xl overflow-hidden border-2 border-gold-premium group cursor-pointer transition-transform duration-200 hover:scale-105 active:scale-95 aspect-square"
                           onClick={() => {
                             setLbOpenedFromSheet(true);
-                            setActivePhotoIndex(photos.indexOf(photo));
+                            const selectedPhotos = photos.filter((p) => selectedIds.has(p.id));
+                            setActivePhotoIndex(selectedPhotos.indexOf(photo));
                           }}
                         >
                           <img
@@ -680,7 +698,11 @@ export default function ClientGallery({ session }: ClientGalleryProps) {
                       <div
                         key={photo.id}
                         className="relative shrink-0 w-14 h-14 rounded-lg overflow-hidden border-2 border-gold-premium group cursor-pointer transition-transform duration-200 hover:scale-105 active:scale-95"
-                        onClick={() => setActivePhotoIndex(photos.indexOf(photo))}
+                        onClick={() => {
+                          setLbOpenedFromSheet(true);
+                          const selectedPhotos = photos.filter((p) => selectedIds.has(p.id));
+                          setActivePhotoIndex(selectedPhotos.indexOf(photo));
+                        }}
                       >
                         <img
                           src={photo.thumbnail_url}
@@ -751,12 +773,12 @@ export default function ClientGallery({ session }: ClientGalleryProps) {
 
 
       {/* Lightbox / Visualização em Tela Cheia */}
-      {activePhotoIndex !== null && (
+      {activePhotoIndex !== null && lightboxPhotos[activePhotoIndex] && (
         <div className="fixed inset-0 bg-black/95 z-50 flex flex-col justify-between select-none">
           {/* Header Lightbox */}
           <div className="h-20 px-4 sm:px-6 lg:px-8 flex items-center justify-between bg-gradient-to-b from-black/80 to-transparent">
             <span className="font-mono text-xs text-zinc-400">
-              {photos[activePhotoIndex].filename} ({activePhotoIndex + 1} de {photos.length})
+              {lightboxPhotos[activePhotoIndex].filename} ({activePhotoIndex + 1} de {lightboxPhotos.length})
             </span>
             
             <button
@@ -785,8 +807,8 @@ export default function ClientGallery({ session }: ClientGalleryProps) {
             {/* Imagem */}
             <div className="flex-1 h-[70vh] flex items-center justify-center relative select-none">
               <img
-                src={photos[activePhotoIndex].thumbnail_url}
-                alt={photos[activePhotoIndex].filename}
+                src={lightboxPhotos[activePhotoIndex].thumbnail_url}
+                alt={lightboxPhotos[activePhotoIndex].filename}
                 draggable={false}
                 onContextMenu={(e) => e.preventDefault()}
                 className="max-w-full max-h-full object-contain pointer-events-none"
@@ -798,8 +820,8 @@ export default function ClientGallery({ session }: ClientGalleryProps) {
 
             {/* Botão Próximo */}
             <button
-              onClick={() => setActivePhotoIndex((prev) => (prev !== null && prev < photos.length - 1 ? prev + 1 : prev))}
-              disabled={activePhotoIndex === photos.length - 1}
+              onClick={() => setActivePhotoIndex((prev) => (prev !== null && prev < lightboxPhotos.length - 1 ? prev + 1 : prev))}
+              disabled={activePhotoIndex === lightboxPhotos.length - 1}
               className="p-3 rounded-full bg-black/45 text-white hover:bg-zinc-800 disabled:opacity-20 disabled:cursor-not-allowed transition-all active:scale-90 cursor-pointer z-10 shrink-0"
             >
               <ChevronRight className="w-7 h-7" />
@@ -809,16 +831,16 @@ export default function ClientGallery({ session }: ClientGalleryProps) {
           {/* Footer Lightbox */}
           <div className="h-24 px-4 flex flex-col items-center justify-center gap-2 bg-gradient-to-t from-black/80 to-transparent pb-4">
             <button
-              onClick={() => toggleSelectPhoto(photos[activePhotoIndex].id)}
+              onClick={() => toggleSelectPhoto(lightboxPhotos[activePhotoIndex].id)}
               className={`flex items-center gap-2 px-6 py-3.5 rounded-full font-medium text-sm transition-all duration-300 active:scale-95 cursor-pointer shadow-md ${
-                selectedIds.has(photos[activePhotoIndex].id)
+                selectedIds.has(lightboxPhotos[activePhotoIndex].id)
                   ? 'bg-gold-premium text-zinc-950 scale-105'
                   : 'bg-zinc-800 text-white hover:bg-zinc-700'
               }`}
             >
-              <Heart className={`w-4 h-4 ${selectedIds.has(photos[activePhotoIndex].id) ? 'fill-zinc-950' : 'fill-none'}`} />
+              <Heart className={`w-4 h-4 ${selectedIds.has(lightboxPhotos[activePhotoIndex].id) ? 'fill-zinc-950' : 'fill-none'}`} />
               <span>
-                {selectedIds.has(photos[activePhotoIndex].id) ? 'Selecionada' : 'Selecionar Foto'}
+                {selectedIds.has(lightboxPhotos[activePhotoIndex].id) ? 'Selecionada' : 'Selecionar Foto'}
               </span>
             </button>
           </div>

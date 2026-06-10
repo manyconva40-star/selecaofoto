@@ -42,6 +42,32 @@ export default function NovaSessaoPage() {
   const coverInputRef = useRef<HTMLInputElement>(null);
   const [coverFile, setCoverFile] = useState<File | null>(null);
   const [coverPreview, setCoverPreview] = useState<string | null>(null);
+  const [coverPositionY, setCoverPositionY] = useState(50);
+  const [isDraggingCover, setIsDraggingCover] = useState(false);
+  const dragStartY = useRef<number>(0);
+  const dragStartPos = useRef<number>(50);
+  const coverPreviewRef = useRef<HTMLDivElement>(null);
+
+  const handleCoverDragStart = (clientY: number) => {
+    if (!coverPreviewRef.current) return;
+    setIsDraggingCover(true);
+    dragStartY.current = clientY;
+    dragStartPos.current = coverPositionY;
+  };
+
+  const handleCoverDragMove = (clientY: number) => {
+    if (!isDraggingCover || !coverPreviewRef.current) return;
+    const containerHeight = coverPreviewRef.current.getBoundingClientRect().height;
+    if (containerHeight === 0) return;
+    const deltaY = clientY - dragStartY.current;
+    const deltaPercent = (deltaY / containerHeight) * 100;
+    const newPos = Math.max(0, Math.min(100, Math.round(dragStartPos.current - deltaPercent)));
+    setCoverPositionY(newPos);
+  };
+
+  const handleCoverDragEnd = () => {
+    setIsDraggingCover(false);
+  };
 
   const handleCoverChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
@@ -52,11 +78,13 @@ export default function NovaSessaoPage() {
       }
       setCoverFile(file);
       setCoverPreview(URL.createObjectURL(file));
+      setCoverPositionY(50);
     }
   };
 
   const handleRemoveCover = () => {
     setCoverFile(null);
+    setCoverPositionY(50);
     if (coverPreview) {
       URL.revokeObjectURL(coverPreview);
       setCoverPreview(null);
@@ -152,6 +180,7 @@ export default function NovaSessaoPage() {
           coverFormData.append('file', resizedCover);
           coverFormData.append('sessionId', createdSession.id);
           coverFormData.append('isCover', 'true');
+          coverFormData.append('coverPositionY', coverPositionY.toString());
 
           const coverResponse = await fetch('/api/photos/upload', {
             method: 'POST',
@@ -380,23 +409,56 @@ export default function NovaSessaoPage() {
                     />
                     
                     {coverPreview ? (
-                      <div className="relative rounded-lg overflow-hidden border border-dark-border bg-zinc-900 aspect-video group">
-                        <img 
-                          src={coverPreview} 
-                          alt="Previa da capa" 
-                          className="w-full h-full object-cover" 
+                      <div
+                        ref={coverPreviewRef}
+                        onMouseDown={(e) => {
+                          e.preventDefault();
+                          handleCoverDragStart(e.clientY);
+                        }}
+                        onMouseMove={(e) => {
+                          handleCoverDragMove(e.clientY);
+                        }}
+                        onMouseUp={handleCoverDragEnd}
+                        onMouseLeave={handleCoverDragEnd}
+                        onTouchStart={(e) => {
+                          handleCoverDragStart(e.touches[0].clientY);
+                        }}
+                        onTouchMove={(e) => {
+                          handleCoverDragMove(e.touches[0].clientY);
+                        }}
+                        onTouchEnd={handleCoverDragEnd}
+                        className={`relative rounded-lg overflow-hidden border border-dark-border bg-zinc-900 aspect-video group select-none ${
+                          isDraggingCover ? 'cursor-grabbing' : 'cursor-grab'
+                        }`}
+                      >
+                        <img
+                          src={coverPreview}
+                          alt="Previa da capa"
+                          draggable={false}
+                          onContextMenu={(e) => e.preventDefault()}
+                          className="w-full h-full object-cover pointer-events-none select-none"
+                          style={{ objectPosition: `center ${coverPositionY}%` }}
                         />
+                        <div className="absolute bottom-2 left-2 bg-black/60 backdrop-blur-md px-2.5 py-1 rounded text-[10px] text-zinc-300 pointer-events-none uppercase tracking-wider font-semibold">
+                          Posicionamento: {coverPositionY}% (Arraste verticalmente)
+                        </div>
                         <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
                           <button
                             type="button"
-                            onClick={() => coverInputRef.current?.click()}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              coverInputRef.current?.click();
+                            }}
                             className="bg-zinc-900/80 hover:bg-zinc-950 text-white p-2.5 rounded-lg text-xs font-medium border border-dark-border cursor-pointer transition-colors"
                           >
                             Alterar
                           </button>
                           <button
                             type="button"
-                            onClick={handleRemoveCover}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleRemoveCover();
+                            }}
                             className="bg-red-950/80 hover:bg-red-900 text-red-400 p-2.5 rounded-lg text-xs font-medium border border-red-500/20 cursor-pointer transition-colors flex items-center gap-1"
                           >
                             <Trash2 className="w-3.5 h-3.5" />
