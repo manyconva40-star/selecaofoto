@@ -111,7 +111,7 @@ export default function SessionDetails({ sessionData, photosData }: SessionDetai
                     ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' 
                     : 'bg-amber-500/10 text-amber-400 border border-amber-500/20'
                 }`}>
-                  {sessionData.status}
+                  {isCompleted ? 'Seleção concluída' : 'Aguardando seleção'}
                 </span>
                 
                 {sessionData.password && (
@@ -134,6 +134,12 @@ export default function SessionDetails({ sessionData, photosData }: SessionDetai
                   <Calendar className="w-4 h-4 text-gold-premium" />
                   <span>Data: {sessionData.session_date ? new Date(sessionData.session_date).toLocaleDateString('pt-BR', { timeZone: 'UTC' }) : '—'}</span>
                 </div>
+                {sessionData.selected_at && (
+                  <div className="flex items-center gap-1.5">
+                    <CheckSquare className="w-4 h-4 text-gold-premium" />
+                    <span>Selecionadas em: <strong className="text-white font-normal">{new Date(sessionData.selected_at).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' })}</strong></span>
+                  </div>
+                )}
               </div>
             </div>
 
@@ -278,7 +284,7 @@ export default function SessionDetails({ sessionData, photosData }: SessionDetai
                 <div
                   key={photo.id}
                   className={`bg-dark-card border rounded-lg overflow-hidden transition-all duration-300 relative group aspect-square ${
-                    photo.selected 
+                    photo.is_selected 
                       ? 'border-gold-premium ring-1 ring-gold-premium' 
                       : 'border-dark-border hover:border-zinc-700'
                   }`}
@@ -292,7 +298,7 @@ export default function SessionDetails({ sessionData, photosData }: SessionDetai
                   />
 
                   {/* Badge de Selecionado */}
-                  {photo.selected && (
+                  {photo.is_selected && (
                     <div className="absolute top-2.5 right-2.5 bg-gold-premium text-zinc-950 p-1 rounded-full shadow-md z-10">
                       <Check className="w-4 h-4 stroke-[3]" />
                     </div>

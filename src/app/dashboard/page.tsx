@@ -13,13 +13,17 @@ export default async function DashboardPage() {
     redirect('/login');
   }
 
-  // Buscar todas as sessões do fotógrafo com as fotos aninhadas (para contagem de seleção)
+  // Buscar todas as sessões do fotógrafo com fotos e seleções (para contagem e data de seleção)
   const { data: sessions, error } = await supabaseAdmin
     .from('sessions')
     .select(`
       *,
       photos (
         id
+      ),
+      selections (
+        photo_id,
+        selected_at
       )
     `)
     .eq('photographer_id', session.user.email)

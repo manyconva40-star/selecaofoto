@@ -125,8 +125,8 @@ export default function DashboardList({ initialSessions, photographerName }: Das
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {sessions.map((session) => {
               const totalPhotos = session.photos?.length || 0;
-              const selectedPhotos = session.photos?.filter((p: any) => p.selected).length || 0;
-              const isCompleted = session.status === 'Seleção concluída';
+              const selectedPhotos = session.selections?.length || 0;
+              const isCompleted = session.status === 'closed';
 
               return (
                 <div 
@@ -156,7 +156,7 @@ export default function DashboardList({ initialSessions, photographerName }: Das
                         ) : (
                           <Clock className="w-3.5 h-3.5" />
                         )}
-                        {session.status}
+                        {isCompleted ? 'Seleção concluída' : 'Aguardando seleção'}
                       </span>
                     </div>
 
@@ -169,7 +169,7 @@ export default function DashboardList({ initialSessions, photographerName }: Das
                     <div className="space-y-2.5 border-t border-dark-border/40 pt-4 mb-6">
                       <div className="flex items-center gap-2 text-text-muted text-sm font-light">
                         <Calendar className="w-4 h-4" />
-                        <span>Data: {new Date(session.date).toLocaleDateString('pt-BR', { timeZone: 'UTC' })}</span>
+                        <span>Data: {session.session_date ? new Date(session.session_date).toLocaleDateString('pt-BR', { timeZone: 'UTC' }) : '—'}</span>
                       </div>
                       
                       <div className="flex items-center gap-2 text-text-muted text-sm font-light">
@@ -180,9 +180,16 @@ export default function DashboardList({ initialSessions, photographerName }: Das
                       <div className="flex items-center gap-2 text-text-muted text-sm font-light">
                         <CheckSquare className="w-4 h-4" />
                         <span className={isCompleted ? 'text-emerald-400 font-medium' : ''}>
-                          Selecionadas: {selectedPhotos} de {session.max_photos}
+                          Selecionadas: {selectedPhotos} de {session.max_selections}
                         </span>
                       </div>
+
+                      {isCompleted && session.selections && session.selections.length > 0 && (
+                        <div className="flex items-center gap-2 text-text-muted text-sm font-light">
+                          <Clock className="w-4 h-4 text-emerald-400" />
+                          <span>Finalizado em: <strong className="text-white font-normal">{new Date(session.selections[0].selected_at).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' })}</strong></span>
+                        </div>
+                      )}
                     </div>
                   </div>
 

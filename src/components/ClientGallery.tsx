@@ -25,6 +25,7 @@ interface ClientGalleryProps {
 }
 
 export default function ClientGallery({ session }: ClientGalleryProps) {
+  const isAdditionalMode = session.isAdditionalMode === true;
   const [password, setPassword] = useState('');
   const [isAuthenticated, setIsAuthenticated] = useState(!session.hasPassword);
   const [photos, setPhotos] = useState<any[]>([]);
@@ -113,7 +114,6 @@ export default function ClientGallery({ session }: ClientGalleryProps) {
     sheetDragDelta.current = 0;
   };
 
-  const isAdditionalMode = session.isAdditionalMode === true;
 
   // Calcular excedente de fotos (desativado no modo adicional)
   const packageLimit = session.max_photos || 0;

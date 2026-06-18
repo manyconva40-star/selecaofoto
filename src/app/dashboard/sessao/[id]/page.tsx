@@ -45,10 +45,11 @@ export default async function SessionDetailsPage({ params }: PageProps) {
   // 3. Buscar quais fotos foram selecionadas pela cliente
   const { data: dbSelections } = await supabaseAdmin
     .from('selections')
-    .select('photo_id')
+    .select('photo_id, selected_at')
     .eq('session_id', id);
 
   const selectedPhotoIds = new Set((dbSelections || []).map((s: any) => s.photo_id));
+  const selectedAt = dbSelections && dbSelections.length > 0 ? dbSelections[0].selected_at : null;
 
   // 4. Marcar cada foto com is_selected
   const photosData = (dbPhotos || []).map((photo: any) => ({
@@ -58,7 +59,10 @@ export default async function SessionDetailsPage({ params }: PageProps) {
 
   return (
     <SessionDetails 
-      sessionData={dbSession} 
+      sessionData={{
+        ...dbSession,
+        selected_at: selectedAt
+      }} 
       photosData={photosData} 
     />
   );
