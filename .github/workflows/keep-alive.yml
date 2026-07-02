@@ -1,0 +1,27 @@
+name: Supabase Keep-Alive
+
+on:
+  schedule:
+    # Executa a cada 3 dias às 00:00 UTC
+    - cron: '0 0 */3 * *'
+  workflow_dispatch: # Permite rodar manualmente pelo painel do GitHub
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ping Supabase Database
+        run: |
+          # Realiza uma consulta simples na tabela de sessões para gerar atividade no banco de dados
+          STATUS_CODE=$(curl -s -o /dev/null -w "%{http_code}" \
+            -X GET "${{ secrets.SUPABASE_URL }}/rest/v1/sessions?select=id&limit=1" \
+            -H "apikey: ${{ secrets.SUPABASE_ANON_KEY }}" \
+            -H "Authorization: Bearer ${{ secrets.SUPABASE_ANON_KEY }}")
+          
+          echo "Supabase respondeu com código HTTP: $STATUS_CODE"
+          
+          if [ "$STATUS_CODE" -eq 200 ] || [ "$STATUS_CODE" -eq 204 ]; then
+            echo "Banco de dados está ativo e respondendo normalmente!"
+          else
+            echo "Aviso: Resposta inesperada do banco de dados (Código: $STATUS_CODE). Verifique as credenciais."
+          fi
