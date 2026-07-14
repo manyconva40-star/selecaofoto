@@ -20,12 +20,21 @@ export default function SessionDetails({ sessionData, photosData }: SessionDetai
   const [copySuccess, setCopySuccess] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [additionalMode, setAdditionalMode] = useState(false);
+  const [showLinkModal, setShowLinkModal] = useState(false);
 
   const selectedPhotos = photos.filter((p) => p.is_selected);
   const totalPhotos = photos.length;
   const isCompleted = sessionData.status === 'closed';
 
-  const handleCopyLink = async () => {
+  const handleCopyLinkClick = () => {
+    if (isCompleted) {
+      setShowLinkModal(true);
+    } else {
+      executeCopyLink(false);
+    }
+  };
+
+  const executeCopyLink = async (isAdditional: boolean) => {
     const origin = window.location.origin;
     
     try {
@@ -33,14 +42,14 @@ export default function SessionDetails({ sessionData, photosData }: SessionDetai
 
       // Sempre gerar review token quando modo adicional está ativo,
       // ou quando a sessão está fechada
-      if (isCompleted || additionalMode) {
+      if (isCompleted || isAdditional) {
         const res = await fetch(`/api/sessions/${sessionData.id}/review-token`, {
           method: 'POST',
         });
         if (res.ok) {
           const { token } = await res.json();
           clientLink = `${origin}/galeria/${sessionData.id}?token=${token}`;
-          if (additionalMode) {
+          if (isAdditional) {
             clientLink += '&modo=adicional';
           }
         }
@@ -48,6 +57,8 @@ export default function SessionDetails({ sessionData, photosData }: SessionDetai
 
       await navigator.clipboard.writeText(clientLink);
       setCopySuccess(true);
+      setAdditionalMode(isAdditional);
+      setShowLinkModal(false);
       setTimeout(() => setCopySuccess(false), 2000);
     } catch (err) {
       console.error('Erro ao copiar link:', err);
@@ -149,7 +160,7 @@ export default function SessionDetails({ sessionData, photosData }: SessionDetai
                 {/* Toggle + Botão de Copiar Link agrupados */}
                 <div className="flex items-stretch gap-0 rounded-lg overflow-hidden border border-dark-border">
                   <button
-                    onClick={handleCopyLink}
+                    onClick={handleCopyLinkClick}
                     className={`flex items-center justify-center gap-2 px-5 py-3 font-medium text-sm transition-all cursor-pointer ${
                       copySuccess
                         ? 'bg-emerald-500/10 text-emerald-400'
@@ -314,6 +325,66 @@ export default function SessionDetails({ sessionData, photosData }: SessionDetai
           )}
         </div>
       </main>
+
+      {/* Modal de Reabertura de Link */}
+      {showLinkModal && (
+        <div className="fixed inset-0 bg-black/75 z-50 flex items-center justify-center p-4">
+          <div className="bg-dark-card border border-dark-border p-6 sm:p-8 rounded-2xl max-w-md w-full space-y-6 shadow-2xl relative overflow-hidden">
+            <div className="absolute -top-10 -left-10 w-40 h-40 bg-gold-premium/5 rounded-full blur-3xl pointer-events-none" />
+            <div className="absolute -bottom-10 -right-10 w-40 h-40 bg-gold-premium/5 rounded-full blur-3xl pointer-events-none" />
+
+            <div className="text-center space-y-2">
+              <h3 className="font-serif text-xl font-semibold text-white">Como deseja gerar o link?</h3>
+              <p className="text-text-muted text-xs sm:text-sm font-light leading-relaxed">
+                Esta seleção já foi finalizada. Escolha o modo de reabertura para a cliente:
+              </p>
+            </div>
+
+            <div className="space-y-3">
+              <button
+                onClick={() => executeCopyLink(false)}
+                className="w-full text-left p-4 rounded-xl border border-dark-border bg-zinc-900/50 hover:bg-zinc-800 transition-all group flex items-start gap-3 cursor-pointer"
+              >
+                <div className="p-2 rounded-lg bg-zinc-800 border border-dark-border group-hover:bg-gold-premium/10 group-hover:border-gold-premium/20 transition-all text-text-muted group-hover:text-gold-premium shrink-0">
+                  <CheckSquare className="w-5 h-5" />
+                </div>
+                <div>
+                  <h4 className="text-sm font-medium text-white group-hover:text-gold-premium transition-colors">
+                    Apenas Reabrir (Modo Normal)
+                  </h4>
+                  <p className="text-xs text-text-muted mt-1 font-light leading-normal">
+                    Permite que a cliente altere suas escolhas originais (mesmo limite de fotos).
+                  </p>
+                </div>
+              </button>
+
+              <button
+                onClick={() => executeCopyLink(true)}
+                className="w-full text-left p-4 rounded-xl border border-dark-border bg-zinc-900/50 hover:bg-zinc-800 transition-all group flex items-start gap-3 cursor-pointer"
+              >
+                <div className="p-2 rounded-lg bg-zinc-800 border border-dark-border group-hover:bg-gold-premium/10 group-hover:border-gold-premium/20 transition-all text-text-muted group-hover:text-gold-premium shrink-0">
+                  <Plus className="w-5 h-5" />
+                </div>
+                <div>
+                  <h4 className="text-sm font-medium text-white group-hover:text-gold-premium transition-colors">
+                    Fotos Adicionais (Modo Adicional)
+                  </h4>
+                  <p className="text-xs text-text-muted mt-1 font-light leading-normal">
+                    As fotos já selecionadas ficam congeladas em P&B. A cliente selecionará apenas as novas fotos adicionais.
+                  </p>
+                </div>
+              </button>
+            </div>
+
+            <button
+              onClick={() => setShowLinkModal(false)}
+              className="w-full border border-dark-border bg-zinc-900/50 hover:bg-zinc-800 text-text-muted hover:text-white font-medium py-3 rounded-lg text-sm transition-all cursor-pointer text-center"
+            >
+              Cancelar
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -18,14 +18,38 @@ export default function DashboardList({ initialSessions, photographerName }: Das
   const [sessions, setSessions] = useState(initialSessions);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [copySuccess, setCopySuccess] = useState<string | null>(null);
+  const [linkModalSession, setLinkModalSession] = useState<any | null>(null);
 
-  const handleCopyLink = async (sessionId: string) => {
+  const handleCopyLinkClick = (session: any) => {
+    const isCompleted = session.status === 'closed';
+    if (isCompleted) {
+      setLinkModalSession(session);
+    } else {
+      executeCopyLink(session, false);
+    }
+  };
+
+  const executeCopyLink = async (session: any, isAdditional: boolean) => {
     const origin = window.location.origin;
-    const clientLink = `${origin}/galeria/${sessionId}`;
+    let clientLink = `${origin}/galeria/${session.id}`;
     
     try {
+      const isCompleted = session.status === 'closed';
+      if (isCompleted || isAdditional) {
+        const res = await fetch(`/api/sessions/${session.id}/review-token`, {
+          method: 'POST',
+        });
+        if (res.ok) {
+          const { token } = await res.json();
+          clientLink = `${origin}/galeria/${session.id}?token=${token}`;
+          if (isAdditional) {
+            clientLink += '&modo=adicional';
+          }
+        }
+      }
       await navigator.clipboard.writeText(clientLink);
-      setCopySuccess(sessionId);
+      setCopySuccess(session.id);
+      setLinkModalSession(null);
       setTimeout(() => setCopySuccess(null), 2000);
     } catch (err) {
       console.error('Erro ao copiar link:', err);
@@ -205,7 +229,7 @@ export default function DashboardList({ initialSessions, photographerName }: Das
                     </Link>
 
                     <button
-                      onClick={() => handleCopyLink(session.id)}
+                      onClick={() => handleCopyLinkClick(session)}
                       className={`flex items-center justify-center gap-1.5 px-3 py-2.5 rounded-lg border text-xs font-medium transition-all cursor-pointer ${
                         copySuccess === session.id
                           ? 'border-emerald-500/35 bg-emerald-500/10 text-emerald-400'
@@ -237,6 +261,66 @@ export default function DashboardList({ initialSessions, photographerName }: Das
           </div>
         )}
       </main>
+
+      {/* Modal de Reabertura de Link (Dashboard List) */}
+      {linkModalSession && (
+        <div className="fixed inset-0 bg-black/75 z-50 flex items-center justify-center p-4">
+          <div className="bg-dark-card border border-dark-border p-6 sm:p-8 rounded-2xl max-w-md w-full space-y-6 shadow-2xl relative overflow-hidden">
+            <div className="absolute -top-10 -left-10 w-40 h-40 bg-gold-premium/5 rounded-full blur-3xl pointer-events-none" />
+            <div className="absolute -bottom-10 -right-10 w-40 h-40 bg-gold-premium/5 rounded-full blur-3xl pointer-events-none" />
+
+            <div className="text-center space-y-2">
+              <h3 className="font-serif text-xl font-semibold text-white">Como deseja gerar o link?</h3>
+              <p className="text-text-muted text-xs sm:text-sm font-light leading-relaxed">
+                A seleção de <strong>{linkModalSession.client_name}</strong> já foi finalizada. Escolha o modo de reabertura:
+              </p>
+            </div>
+
+            <div className="space-y-3">
+              <button
+                onClick={() => executeCopyLink(linkModalSession, false)}
+                className="w-full text-left p-4 rounded-xl border border-dark-border bg-zinc-900/50 hover:bg-zinc-800 transition-all group flex items-start gap-3 cursor-pointer"
+              >
+                <div className="p-2 rounded-lg bg-zinc-800 border border-dark-border group-hover:bg-gold-premium/10 group-hover:border-gold-premium/20 transition-all text-text-muted group-hover:text-gold-premium shrink-0">
+                  <CheckSquare className="w-5 h-5" />
+                </div>
+                <div>
+                  <h4 className="text-sm font-medium text-white group-hover:text-gold-premium transition-colors">
+                    Apenas Reabrir (Modo Normal)
+                  </h4>
+                  <p className="text-xs text-text-muted mt-1 font-light leading-normal">
+                    Permite que a cliente altere suas escolhas originais (mesmo limite de fotos).
+                  </p>
+                </div>
+              </button>
+
+              <button
+                onClick={() => executeCopyLink(linkModalSession, true)}
+                className="w-full text-left p-4 rounded-xl border border-dark-border bg-zinc-900/50 hover:bg-zinc-800 transition-all group flex items-start gap-3 cursor-pointer"
+              >
+                <div className="p-2 rounded-lg bg-zinc-800 border border-dark-border group-hover:bg-gold-premium/10 group-hover:border-gold-premium/20 transition-all text-text-muted group-hover:text-gold-premium shrink-0">
+                  <Plus className="w-5 h-5" />
+                </div>
+                <div>
+                  <h4 className="text-sm font-medium text-white group-hover:text-gold-premium transition-colors">
+                    Fotos Adicionais (Modo Adicional)
+                  </h4>
+                  <p className="text-xs text-text-muted mt-1 font-light leading-normal">
+                    As fotos já selecionadas ficam congeladas em P&B. A cliente selecionará apenas as novas fotos adicionais.
+                  </p>
+                </div>
+              </button>
+            </div>
+
+            <button
+              onClick={() => setLinkModalSession(null)}
+              className="w-full border border-dark-border bg-zinc-900/50 hover:bg-zinc-800 text-text-muted hover:text-white font-medium py-3 rounded-lg text-sm transition-all cursor-pointer text-center"
+            >
+              Cancelar
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
