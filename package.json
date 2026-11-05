@@ -6,7 +6,8 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "keep-alive": "bun run scripts/keep-alive.ts"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.108.1",

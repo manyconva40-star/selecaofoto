@@ -1,24 +1,58 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { signOut } from 'next-auth/react';
 import Link from 'next/link';
 import { 
   Camera, Plus, Link as LinkIcon, Trash2, Eye, 
   CheckCircle, Clock, LogOut, Calendar, User, 
-  Image as ImageIcon, CheckSquare, Loader2 
+  Image as ImageIcon, CheckSquare, Loader2,
+  RefreshCw, AlertTriangle
 } from 'lucide-react';
 
 interface DashboardListProps {
   initialSessions: any[];
   photographerName: string;
+  dbError?: string | null;
 }
 
-export default function DashboardList({ initialSessions, photographerName }: DashboardListProps) {
+export default function DashboardList({ initialSessions, photographerName, dbError }: DashboardListProps) {
   const [sessions, setSessions] = useState(initialSessions);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [copySuccess, setCopySuccess] = useState<string | null>(null);
   const [linkModalSession, setLinkModalSession] = useState<any | null>(null);
+  const [isSyncing, setIsSyncing] = useState(false);
+  const [syncStatus, setSyncStatus] = useState<string | null>(null);
+
+  useEffect(() => {
+    // Sincronização automática se o painel carregar sem sessões
+    if (initialSessions.length === 0) {
+      handleSyncDrive();
+    }
+  }, []);
+
+  const handleSyncDrive = async () => {
+    setIsSyncing(true);
+    setSyncStatus('Buscando e restaurando seus ensaios do Google Drive automaticamente...');
+    try {
+      const response = await fetch('/api/sessions/sync');
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Erro ao sincronizar com Google Drive');
+      }
+
+      setSyncStatus('Ensaios restaurados com sucesso! Atualizando tela...');
+      setTimeout(() => {
+        window.location.reload();
+      }, 1000);
+    } catch (error: any) {
+      console.error('Erro ao sincronizar:', error);
+      setSyncStatus(null);
+    } finally {
+      setIsSyncing(false);
+    }
+  };
 
   const handleCopyLinkClick = (session: any) => {
     const isCompleted = session.status === 'closed';
@@ -120,30 +154,85 @@ export default function DashboardList({ initialSessions, photographerName }: Das
             </p>
           </div>
 
-          <Link
-            href="/dashboard/nova-sessao"
-            className="flex items-center justify-center gap-2 bg-gold-premium hover:bg-gold-premium-hover text-zinc-950 font-medium px-5 py-3 rounded-lg transition-all duration-300 cursor-pointer shadow-md shadow-gold-premium/10 hover:shadow-gold-premium/20 active:scale-95"
-          >
-            <Plus className="w-5 h-5" />
-            <span>Nova Sessão</span>
-          </Link>
+          <div className="flex items-center gap-3">
+            <button
+              onClick={handleSyncDrive}
+              disabled={isSyncing}
+              className="flex items-center justify-center gap-2 bg-zinc-900 hover:bg-zinc-800 text-white font-medium px-4 py-3 rounded-lg border border-dark-border transition-all duration-300 cursor-pointer disabled:opacity-50"
+              title="Recuperar e sincronizar ensaios do Google Drive"
+            >
+              <RefreshCw className={`w-4 h-4 text-gold-premium ${isSyncing ? 'animate-spin' : ''}`} />
+              <span className="hidden sm:inline">{isSyncing ? 'Sincronizando...' : 'Sincronizar Drive'}</span>
+            </button>
+
+            <Link
+              href="/dashboard/nova-sessao"
+              className="flex items-center justify-center gap-2 bg-gold-premium hover:bg-gold-premium-hover text-zinc-950 font-medium px-5 py-3 rounded-lg transition-all duration-300 cursor-pointer shadow-md shadow-gold-premium/10 hover:shadow-gold-premium/20 active:scale-95"
+            >
+              <Plus className="w-5 h-5" />
+              <span>Nova Sessão</span>
+            </Link>
+          </div>
         </div>
+
+        {/* Alerta de Erro de Banco de Dados */}
+        {dbError && (
+          <div className="mb-8 p-4 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-200 flex items-start gap-3">
+            <AlertTriangle className="w-5 h-5 text-amber-400 shrink-0 mt-0.5" />
+            <div className="text-sm">
+              <strong className="font-semibold block mb-1">Aviso do Banco de Dados (Supabase)</strong>
+              <p className="font-light leading-relaxed">
+                Não foi possível conectar ao banco de dados ({dbError}).
+                Como o plano gratuito do Supabase pausa o banco após 7 dias de inatividade, acesse o{' '}
+                <a 
+                  href="https://supabase.com/dashboard/project/aulerhoqdfojonvwnduo" 
+                  target="_blank" 
+                  rel="noopener noreferrer"
+                  className="underline text-gold-premium hover:text-white font-medium"
+                >
+                  Painel do seu Projeto Supabase
+                </a>
+                {' '}e clique em <strong>Restore project</strong> (Restaurar projeto). Seus dados continuam salvos e voltarão em instantes!
+              </p>
+            </div>
+          </div>
+        )}
+
+        {/* Status da Sincronização */}
+        {syncStatus && (
+          <div className="mb-6 p-4 rounded-xl bg-zinc-900 border border-gold-premium/30 text-gold-premium flex items-center gap-3">
+            <Loader2 className="w-5 h-5 animate-spin" />
+            <span className="text-sm font-medium">{syncStatus}</span>
+          </div>
+        )}
 
         {/* Lista de Sessões */}
         {sessions.length === 0 ? (
-          <div className="flex flex-col items-center justify-center text-center p-16 border border-dashed border-dark-border/80 rounded-2xl bg-dark-card/20 max-w-2xl mx-auto mt-8">
+          <div className="flex flex-col items-center justify-center text-center p-10 sm:p-16 border border-dashed border-dark-border/80 rounded-2xl bg-dark-card/20 max-w-2xl mx-auto mt-8">
             <ImageIcon className="w-12 h-12 text-zinc-700 mb-4" />
-            <h3 className="font-serif text-xl font-medium text-white mb-2">Nenhuma sessão criada</h3>
-            <p className="text-text-muted text-sm font-light max-w-sm mb-8 leading-relaxed">
-              Você ainda não tem sessões cadastradas. Comece criando um novo link para sua cliente.
+            <h3 className="font-serif text-xl font-medium text-white mb-2">Nenhuma sessão encontrada no painel</h3>
+            <p className="text-text-muted text-sm font-light max-w-md mb-8 leading-relaxed">
+              Se você já enviou ensaios anteriormente ou possui pastas no seu <strong>Google Drive</strong> (pasta <em>FotoSelecao</em>), clique no botão abaixo para recuperá-los automaticamente.
             </p>
-            <Link
-              href="/dashboard/nova-sessao"
-              className="flex items-center gap-2 border border-gold-premium hover:bg-gold-premium hover:text-zinc-950 text-gold-premium font-medium px-5 py-3 rounded-lg transition-all duration-300 cursor-pointer"
-            >
-              <Plus className="w-4 h-4" />
-              <span>Criar minha primeira sessão</span>
-            </Link>
+
+            <div className="flex flex-col sm:flex-row items-center gap-4 w-full sm:w-auto">
+              <button
+                onClick={handleSyncDrive}
+                disabled={isSyncing}
+                className="w-full sm:w-auto flex items-center justify-center gap-2.5 bg-gold-premium hover:bg-gold-premium-hover text-zinc-950 font-medium px-6 py-3.5 rounded-xl transition-all duration-300 cursor-pointer shadow-lg shadow-gold-premium/15 active:scale-95 disabled:opacity-50"
+              >
+                <RefreshCw className={`w-5 h-5 ${isSyncing ? 'animate-spin' : ''}`} />
+                <span>{isSyncing ? 'Recuperando ensaios...' : 'Recuperar Ensaios do Google Drive'}</span>
+              </button>
+
+              <Link
+                href="/dashboard/nova-sessao"
+                className="w-full sm:w-auto flex items-center justify-center gap-2 border border-dark-border bg-dark-card hover:bg-zinc-800 text-white font-medium px-5 py-3.5 rounded-xl transition-all duration-300 cursor-pointer"
+              >
+                <Plus className="w-4 h-4" />
+                <span>Criar nova sessão</span>
+              </Link>
+            </div>
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">

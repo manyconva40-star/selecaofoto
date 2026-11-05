@@ -2,26 +2,67 @@ name: Supabase Keep-Alive
 
 on:
   schedule:
-    # Executa a cada 3 dias às 00:00 UTC
-    - cron: '0 0 */3 * *'
-  workflow_dispatch: # Permite rodar manualmente pelo painel do GitHub
+    # Executa duas vezes ao dia (06:00 e 18:00 UTC) para garantir atividade constante e evitar a pausa de 7 dias
+    - cron: '0 6,18 * * *'
+  workflow_dispatch: # Permite acionamento manual no GitHub Actions
+
+permissions:
+  contents: write
 
 jobs:
   ping:
     runs-on: ubuntu-latest
     steps:
-      - name: Ping Supabase Database
+      - name: Checkout do Repositório
+        uses: actions/checkout@v4
+
+      - name: Definir Variáveis e Credenciais
+        id: config
         run: |
-          # Realiza uma consulta simples na tabela de sessões para gerar atividade no banco de dados
+          URL="${{ secrets.SUPABASE_URL }}"
+          if [ -z "$URL" ]; then
+            URL="https://aulerhoqdfojonvwnduo.supabase.co"
+          fi
+          # Remover barra no final se existir
+          URL="${URL%/}"
+
+          KEY="${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}"
+          if [ -z "$KEY" ]; then
+            KEY="${{ secrets.SUPABASE_ANON_KEY }}"
+          fi
+          if [ -z "$KEY" ]; then
+            KEY="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImF1bGVyaG9xZGZvam9udnduZHVvIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc4MTA5NjM0OCwiZXhwIjoyMDk2NjcyMzQ4fQ.3muUY-7oXW_1c9-SkB4L7BGvqOSeIvb7QWVGh6m0Blc"
+          fi
+
+          echo "SUPABASE_URL=$URL" >> $GITHUB_ENV
+          echo "SUPABASE_KEY=$KEY" >> $GITHUB_ENV
+
+      - name: Ping PostgREST Database API (Gera atividade no PostgreSQL)
+        run: |
           STATUS_CODE=$(curl -s -o /dev/null -w "%{http_code}" \
-            -X GET "${{ secrets.SUPABASE_URL }}/rest/v1/sessions?select=id&limit=1" \
-            -H "apikey: ${{ secrets.SUPABASE_ANON_KEY }}" \
-            -H "Authorization: Bearer ${{ secrets.SUPABASE_ANON_KEY }}")
+            -X GET "${SUPABASE_URL}/rest/v1/sessions?select=id&limit=1" \
+            -H "apikey: ${SUPABASE_KEY}" \
+            -H "Authorization: Bearer ${SUPABASE_KEY}")
           
-          echo "Supabase respondeu com código HTTP: $STATUS_CODE"
+          echo "API Rest respondeu com código HTTP: $STATUS_CODE"
           
           if [ "$STATUS_CODE" -eq 200 ] || [ "$STATUS_CODE" -eq 204 ]; then
-            echo "Banco de dados está ativo e respondendo normalmente!"
+            echo "✅ Banco de dados PostgreSQL está ativo e respondendo!"
           else
-            echo "Aviso: Resposta inesperada do banco de dados (Código: $STATUS_CODE). Verifique as credenciais."
+            echo "::warning::Resposta atípica da API Rest (Código: $STATUS_CODE). Verifique o estado do projeto no Supabase."
           fi
+
+      - name: Ping Auth API Health
+        run: |
+          STATUS_CODE=$(curl -s -o /dev/null -w "%{http_code}" \
+            -X GET "${SUPABASE_URL}/auth/v1/health")
+          
+          echo "API Auth respondeu com código HTTP: $STATUS_CODE"
+          if [ "$STATUS_CODE" -eq 200 ]; then
+            echo "✅ Serviço Auth do Supabase está operacional!"
+          fi
+
+      - name: Prevenir desativação automática do GitHub Actions após 60 dias
+        uses: gautamkrishnar/keepalive-workflow@v2
+
+

@@ -1,7 +1,7 @@
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { redirect } from 'next/navigation';
-import { supabaseAdmin } from '@/lib/supabase';
+import { fetchSessionsForPhotographer } from '@/lib/db';
 import DashboardList from '@/components/DashboardList';
 
 export const revalidate = 0; // Evita cache para garantir dados sempre atualizados
@@ -13,33 +13,27 @@ export default async function DashboardPage() {
     redirect('/login');
   }
 
-  // Buscar todas as sessões do fotógrafo com fotos e seleções (para contagem e data de seleção)
-  const { data: sessions, error } = await supabaseAdmin
-    .from('sessions')
-    .select(`
-      *,
-      photos (
-        id
-      ),
-      selections (
-        photo_id,
-        selected_at
-      )
-    `)
-    .eq('photographer_id', session.user.email)
-    .order('created_at', { ascending: false });
+  let sessions: any[] = [];
+  let dbError: string | null = null;
 
-  if (error) {
-    console.error('Erro ao buscar sessões do Supabase:', error);
+  try {
+    const result = await fetchSessionsForPhotographer(session.user.email);
+    sessions = result.sessions;
+    dbError = result.error;
+  } catch (err: any) {
+    console.error('Exceção ao carregar sessões:', err);
+    dbError = err.message || 'Falha ao buscar sessões.';
   }
 
-  const initialSessions = sessions || [];
   const photographerName = session.user.name || 'Fotógrafo';
 
   return (
     <DashboardList 
-      initialSessions={initialSessions} 
+      initialSessions={sessions} 
       photographerName={photographerName} 
+      dbError={dbError}
     />
   );
 }
+
+

@@ -62,6 +62,16 @@ body {
   }
 }
 
+/* Screen capture prevention: blur screen when window loses focus */
+body.page-blurred {
+  filter: blur(60px) !important;
+  pointer-events: none !important;
+  user-select: none !important;
+}
+body.page-blurred * {
+  pointer-events: none !important;
+}
+
 /* Animations */
 @keyframes fadeIn {
   from {

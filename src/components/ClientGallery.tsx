@@ -33,6 +33,7 @@ export default function ClientGallery({ session }: ClientGalleryProps) {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   // IDs das fotos já selecionadas anteriormente (visíveis em P&B no modo adicional)
   const [previouslySelectedIds, setPreviouslySelectedIds] = useState<Set<string>>(new Set());
+  const [isInitialLoadComplete, setIsInitialLoadComplete] = useState(false);
   const [activePhotoIndex, setActivePhotoIndex] = useState<number | null>(null);
   
   const [error, setError] = useState<string | null>(null);
@@ -125,7 +126,21 @@ export default function ClientGallery({ session }: ClientGalleryProps) {
     // 1. Bloquear perda de foco (captura printscreen de celular/PC)
     const handleBlur = () => {
       if (isAuthenticated && !isSuccess) {
+        document.body.classList.add('page-blurred');
         setShowCopyrightWarning(true);
+      }
+    };
+
+    const handleFocus = () => {
+      document.body.classList.remove('page-blurred');
+    };
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'hidden') {
+        if (isAuthenticated && !isSuccess) {
+          document.body.classList.add('page-blurred');
+          setShowCopyrightWarning(true);
+        }
       }
     };
 
@@ -139,6 +154,7 @@ export default function ClientGallery({ session }: ClientGalleryProps) {
       // Tecla PrintScreen / PrtScn
       if (e.key === 'PrintScreen' || e.key === 'PrtScn' || e.keyCode === 44) {
         e.preventDefault();
+        document.body.classList.add('page-blurred');
         setShowCopyrightWarning(true);
         try {
           navigator.clipboard.writeText('Galeria Protegida © - Cópia Proibida');
@@ -202,6 +218,8 @@ export default function ClientGallery({ session }: ClientGalleryProps) {
     };
 
     window.addEventListener('blur', handleBlur);
+    window.addEventListener('focus', handleFocus);
+    document.addEventListener('visibilitychange', handleVisibilityChange);
     window.addEventListener('keydown', handleKeyDownProtection, true);
     document.addEventListener('contextmenu', handleContextMenu);
     document.addEventListener('copy', handleCopy);
@@ -210,11 +228,16 @@ export default function ClientGallery({ session }: ClientGalleryProps) {
 
     return () => {
       window.removeEventListener('blur', handleBlur);
+      window.removeEventListener('focus', handleFocus);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
       window.removeEventListener('keydown', handleKeyDownProtection, true);
       document.removeEventListener('contextmenu', handleContextMenu);
       document.removeEventListener('copy', handleCopy);
       document.removeEventListener('cut', handleCopy);
       document.removeEventListener('dragstart', handleDragStart);
+      
+      // Limpar classe de blur do body ao desmontar
+      document.body.classList.remove('page-blurred');
     };
   }, [isAuthenticated, isSuccess]);
 
@@ -233,28 +256,56 @@ export default function ClientGallery({ session }: ClientGalleryProps) {
       }
 
       const data = await response.json();
+      let serverSelectedIds: string[] = [];
       if (data && typeof data === 'object' && !Array.isArray(data)) {
         setPhotos(data.photos || []);
         if (data.selectedPhotoIds) {
-          if (isAdditionalMode) {
-            // Em modo adicional: fotos antigas ficam em P&B (previouslySelectedIds)
-            // e a nova seleção começa vazia
-            setPreviouslySelectedIds(new Set(data.selectedPhotoIds));
-            setSelectedIds(new Set());
-          } else {
-            setSelectedIds(new Set(data.selectedPhotoIds));
-          }
+          serverSelectedIds = data.selectedPhotoIds;
         }
       } else {
         setPhotos(Array.isArray(data) ? data : []);
       }
+
+      if (isAdditionalMode) {
+        // Em modo adicional: fotos antigas ficam em P&B (previouslySelectedIds)
+        setPreviouslySelectedIds(new Set(serverSelectedIds));
+      }
+
+      // Restaurar do localStorage se a sessão não estiver fechada
+      const isClosed = session.status === 'closed';
+      const storageKey = `fotoselecao_draft_${session.id}${isAdditionalMode ? '_additional' : ''}`;
+
+      if (isClosed) {
+        setSelectedIds(new Set(isAdditionalMode ? [] : serverSelectedIds));
+        try {
+          localStorage.removeItem(storageKey);
+        } catch (_) {}
+      } else {
+        try {
+          const localDraft = localStorage.getItem(storageKey);
+          if (localDraft) {
+            const parsed = JSON.parse(localDraft);
+            if (Array.isArray(parsed)) {
+              setSelectedIds(new Set(parsed));
+            } else {
+              setSelectedIds(new Set(isAdditionalMode ? [] : serverSelectedIds));
+            }
+          } else {
+            setSelectedIds(new Set(isAdditionalMode ? [] : serverSelectedIds));
+          }
+        } catch (_) {
+          setSelectedIds(new Set(isAdditionalMode ? [] : serverSelectedIds));
+        }
+      }
+
+      setIsInitialLoadComplete(true);
     } catch (err: any) {
       console.error(err);
       setError(err.message || 'Erro ao carregar fotos da galeria.');
     } finally {
       setLoading(false);
     }
-  }, [session.id, password, isAdditionalMode]);
+  }, [session.id, password, isAdditionalMode, session.status]);
 
   // Carregar fotos se já estiver autenticado no início
   useEffect(() => {
@@ -262,6 +313,18 @@ export default function ClientGallery({ session }: ClientGalleryProps) {
       fetchPhotos();
     }
   }, [isAuthenticated, fetchPhotos]);
+
+  // Salvar rascunho de seleção no localStorage a cada alteração
+  useEffect(() => {
+    if (!isInitialLoadComplete || session.status === 'closed') return;
+    
+    try {
+      const storageKey = `fotoselecao_draft_${session.id}${isAdditionalMode ? '_additional' : ''}`;
+      localStorage.setItem(storageKey, JSON.stringify(Array.from(selectedIds)));
+    } catch (e) {
+      console.error('Erro ao salvar rascunho no localStorage:', e);
+    }
+  }, [selectedIds, session.id, isAdditionalMode, isInitialLoadComplete, session.status]);
 
   // Lidar com envio de senha
   const handlePasswordSubmit = async (e: React.FormEvent) => {
@@ -293,7 +356,7 @@ export default function ClientGallery({ session }: ClientGalleryProps) {
 
   // Alternar seleção da foto
   const toggleSelectPhoto = (photoId: string) => {
-    if (session.status === 'closed') return;
+    if (session.status === 'closed' || isSuccess) return;
     // Em modo adicional, fotos já selecionadas não podem ser alteradas
     if (isAdditionalMode && previouslySelectedIds.has(photoId)) return;
 
@@ -336,6 +399,12 @@ export default function ClientGallery({ session }: ClientGalleryProps) {
         origin: { y: 0.6 },
         colors: ['#C5A880', '#FFFFFF', '#161618'],
       });
+
+      // Limpar rascunho do localStorage após sucesso
+      const storageKey = `fotoselecao_draft_${session.id}${isAdditionalMode ? '_additional' : ''}`;
+      try {
+        localStorage.removeItem(storageKey);
+      } catch (_) {}
 
       setIsSuccess(true);
     } catch (err: any) {
@@ -576,8 +645,15 @@ export default function ClientGallery({ session }: ClientGalleryProps) {
                             : 'group-hover:scale-103'
                         }`}
                       />
-                      {/* Overlay anti-screenshot transparente */}
-                      <div className="absolute inset-0" style={{ background: 'transparent' }} />
+                      {/* Overlay anti-screenshot com marca d'água */}
+                      <div 
+                        className="absolute inset-0 flex items-center justify-center pointer-events-none select-none overflow-hidden"
+                        style={{ background: 'transparent' }}
+                      >
+                        <span className="text-white/10 dark:text-white/8 text-[9px] font-sans tracking-[0.25em] uppercase whitespace-nowrap rotate-[-25deg] select-none pointer-events-none font-semibold">
+                          {session.photographer_name || 'FOTOSELEÇÃO'} • PROVA
+                        </span>
+                      </div>
                     </div>
 
                     {/* Badge "Já Selecionada" para modo adicional */}
@@ -863,8 +939,15 @@ export default function ClientGallery({ session }: ClientGalleryProps) {
                 className="max-w-full max-h-full object-contain pointer-events-none"
                 style={{ userSelect: 'none', WebkitUserSelect: 'none' }}
               />
-              {/* Overlay anti-screenshot no lightbox */}
-              <div className="absolute inset-0" style={{ background: 'transparent', pointerEvents: 'none' }} />
+              {/* Overlay anti-screenshot no lightbox com marca d'água */}
+              <div 
+                className="absolute inset-0 flex items-center justify-center select-none pointer-events-none overflow-hidden" 
+                style={{ background: 'transparent' }}
+              >
+                <span className="text-white/10 dark:text-white/8 text-sm sm:text-lg font-sans tracking-[0.3em] uppercase whitespace-nowrap rotate-[-25deg] select-none pointer-events-none font-semibold">
+                  {session.photographer_name || 'FOTOSELEÇÃO'} • PROVA
+                </span>
+              </div>
             </div>
 
             {/* Botão Próximo */}
@@ -963,7 +1046,10 @@ export default function ClientGallery({ session }: ClientGalleryProps) {
             </div>
 
             <button
-              onClick={() => setShowCopyrightWarning(false)}
+              onClick={() => {
+                setShowCopyrightWarning(false);
+                document.body.classList.remove('page-blurred');
+              }}
               className="w-full bg-gold-premium hover:bg-gold-premium-hover text-zinc-950 font-bold py-3.5 rounded-lg text-sm transition-all duration-300 shadow-md shadow-gold-premium/10 hover:shadow-gold-premium/20 active:scale-98 cursor-pointer"
             >
               Continuar na Galeria

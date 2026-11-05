@@ -1,7 +1,6 @@
-import { supabaseAdmin } from '@/lib/supabase';
+import { getSessionDetailsById } from '@/lib/db';
 import ClientGallery from '@/components/ClientGallery';
 import { Camera, AlertCircle } from 'lucide-react';
-import Link from 'next/link';
 
 export const revalidate = 0; // Evita cache
 
@@ -14,14 +13,9 @@ export default async function ClientGalleryPage({ params, searchParams }: PagePr
   const { id } = await params;
   const { token, modo } = await searchParams;
 
-  // 1. Buscar metadados essenciais da sessão no Supabase (sem carregar a senha real no HTML inicial)
-  const { data: dbSession, error } = await supabaseAdmin
-    .from('sessions')
-    .select('id, client_name, session_date, max_selections, status, photographer_id, password, review_token, cover_image_url, photographer_name')
-    .eq('id', id)
-    .single();
+  const { session: dbSession } = await getSessionDetailsById(id);
 
-  if (error || !dbSession) {
+  if (!dbSession) {
     return (
       <div className="flex-1 flex flex-col items-center justify-center bg-dark-bg min-h-screen px-4 text-center font-sans">
         <div className="max-w-sm p-8 bg-dark-card border border-dark-border rounded-2xl shadow-xl space-y-5">
@@ -45,23 +39,24 @@ export default async function ClientGalleryPage({ params, searchParams }: PagePr
   const isReopened =
     token !== undefined &&
     token !== '' &&
-    dbSession.review_token !== null &&
-    token === dbSession.review_token;
+    dbSession.share_token !== null &&
+    token === dbSession.share_token;
 
   // Sanitizar o objeto da sessão para a galeria pública, informando apenas se possui senha
   const sanitizedSession = {
     id: dbSession.id,
     client_name: dbSession.client_name,
-    date: dbSession.session_date,
-    max_photos: dbSession.max_selections,
+    date: dbSession.session_date || new Date().toISOString().split('T')[0],
+    max_photos: dbSession.max_selections ?? 0,
     hasPassword: dbSession.password !== null && dbSession.password !== '',
-    status: isReopened ? 'active' : dbSession.status,
+    status: (isReopened ? 'active' : dbSession.status) || 'active',
     photographer_id: dbSession.photographer_id,
     reviewToken: isReopened ? token : undefined,
-    cover_image_url: dbSession.cover_image_url,
-    photographer_name: dbSession.photographer_name,
+    cover_image_url: dbSession.cover_image_url || undefined,
+    photographer_name: dbSession.photographer_name || undefined,
     isAdditionalMode: isReopened && modo === 'adicional',
   };
 
   return <ClientGallery session={sanitizedSession} />;
 }
+

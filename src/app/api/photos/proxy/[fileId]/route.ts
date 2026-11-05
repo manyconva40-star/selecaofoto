@@ -14,23 +14,33 @@ export async function GET(
     }
 
     // Como as imagens foram marcadas como públicas (role: reader, type: anyone) durante o upload,
-    // usamos a API do Google Drive v3 com API Key para servir o conteúdo binário.
-    // Isso é mais confiável do que uc?export=download, que pode redirecionar para vírus-scan.
-    const apiKey = process.env.GOOGLE_API_KEY;
-    const url = apiKey
-      ? `https://www.googleapis.com/drive/v3/files/${fileId}?alt=media&key=${apiKey}`
-      : `https://drive.google.com/uc?export=download&id=${fileId}`;
+    // usamos o endpoint de miniaturas (thumbnail) do Google Drive. Ele retorna a imagem
+    // em tamanho médio e otimizado (sz=w1200) de forma pública e confiável, sem exigir
+    // autenticação OAuth 2.0 ou chaves de API (que não são suportadas com alt=media)
+    // e sem cair no aviso de vírus-scan do uc?export=download.
+    const url = `https://drive.google.com/thumbnail?id=${fileId}&sz=w1200`;
 
-    const response = await fetch(url, {
-      // Não enviar headers de autenticação para requisições com API Key pública
+    let response = await fetch(url, {
       headers: {
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
       },
       redirect: 'follow',
     });
 
+    // Fallback: se o endpoint de miniatura falhar por qualquer motivo, tenta a URL uc
     if (!response.ok) {
-      console.error(`Falha ao buscar imagem do Drive (Status: ${response.status})`);
+      console.warn(`Falha ao buscar miniatura do Drive (Status: ${response.status}). Tentando export/download fallback...`);
+      const fallbackUrl = `https://drive.google.com/uc?export=download&id=${fileId}`;
+      response = await fetch(fallbackUrl, {
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+        },
+        redirect: 'follow',
+      });
+    }
+
+    if (!response.ok) {
+      console.error(`Falha ao buscar imagem do Drive em ambos os endpoints (Status: ${response.status})`);
       return new NextResponse('Imagem inacessível.', { status: response.status });
     }
 
@@ -44,7 +54,7 @@ export async function GET(
         'Cache-Control': 'public, max-age=86400, stale-while-revalidate=3600',
       },
     });
-  } catch (error: any) {
+  } catch (error) {
     console.error('Erro no proxy público de imagem:', error);
     return new NextResponse('Erro ao carregar imagem.', { status: 500 });
   }
